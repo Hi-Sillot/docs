@@ -162,6 +162,7 @@ export default defineUserConfig({
       },
       // include: true,      // 在 Markdown 文件中导入其他 markdown 文件内容
       imageSize: 'local', // 启用 自动填充 图片宽高属性，避免页面抖动
+      mark: 'lazy', // 马克笔滚动到可视区域后再播放动画
     },
 
     /**
