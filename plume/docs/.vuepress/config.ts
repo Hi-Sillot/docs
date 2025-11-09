@@ -117,7 +117,7 @@ export default defineUserConfig({
     },
 
     /* 文章字数统计、阅读时间，设置为 false 则禁用 */
-    // readingTime: true,
+    readingTime: {},
 
     /**
      * markdown
@@ -174,17 +174,19 @@ export default defineUserConfig({
      * 评论 comments
      * @see https://theme-plume.vuejs.press/guide/features/comments/
      */
-    // comment: {
-    //   provider: '', // "Artalk" | "Giscus" | "Twikoo" | "Waline"
-    //   comment: true,
-    //   repo: '',
-    //   repoId: '',
-    //   category: '',
-    //   categoryId: '',
-    //   mapping: 'pathname',
-    //   reactionsEnabled: true,
-    //   inputPosition: 'top',
-    // },
+    comment: {
+      provider: 'Giscus', // "Artalk" | "Giscus" | "Twikoo" | "Waline"
+      comment: true,
+      repo: 'Hi-Sillot/docs',
+      repoId: 'R_kgDOQSDvwg',
+      category: 'Announcements',
+      categoryId: 'DIC_kwDOQSDvws4CxmPy',
+      mapping: 'pathname',
+      strict: true,
+      reactionsEnabled: true,
+      inputPosition: 'top',
+      lazyLoading: true,
+    },
 
     /**
      * 资源链接替换
