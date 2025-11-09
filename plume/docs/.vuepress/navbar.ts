@@ -7,16 +7,25 @@
 import { defineNavbarConfig } from 'vuepress-theme-plume'
 
 export default defineNavbarConfig([
-  { text: '首页', link: '/' },
-  { text: '博客', link: '/blog/' },
-  { text: '标签', link: '/blog/tags/' },
-  { text: '归档', link: '/blog/archives/' },
-  // { text: '原汐洛文档', link: '/origin/index.mdx' },
+  // { text: '首页', link: '/' },
+  
+      { text: '开发者文档', link: '/col_doc/1_developNotes/README.md' },
+      { text: '发行文档', link: '/col_doc/2_releaseNotes/README.md' },
+      { text: '汐洛指南', link: '/col_doc/3_sillotGuides/README.md' },
+  {
+    text: '博客',
+    items: [
+      { text: '所有博客', link: '/blog/' },
+      { text: '标签', link: '/blog/tags/' },
+      { text: '归档', link: '/blog/archives/' },
+    ]
+  },
   {
     text: '更多',
     items: [
       { text: '示例', link: '/demo/README.md' },
-      { text: '原汐洛文档', link: '/origin/README.md' }
+      { text: '原汐洛文档', link: '/col_doc/origin/README.md' },
+      { text: '数据统计', link: '/col_doc/4_stats/README.md' },
     ]
   },
 ])

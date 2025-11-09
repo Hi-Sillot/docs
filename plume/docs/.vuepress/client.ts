@@ -9,6 +9,7 @@ import BannerTopArchived from "./components/BannerTopArchived.vue"
 import BannerTopPrLock from "./components/BannerTopPrLock.vue"
 import BannerTopPrNeed from "./components/BannerTopPrNeed.vue"
 import VSCodeSettingsLink from "./components/VSCodeSettingsLink.vue"
+import GithubLabel from "./components/GithubLabel.vue"
 
 import { createPinia } from "pinia";
 import { useAuthorStore } from "./stores/author";
@@ -38,6 +39,7 @@ export default defineClientConfig({
     app.component('BannerTopPrLock', BannerTopPrLock)
     app.component('BannerTopPrNeed', BannerTopPrNeed)
     app.component('VSCodeSettingsLink', VSCodeSettingsLink)
+    app.component('GithubLabel', GithubLabel)
 
     // 注册Pinia状态管理
     const pinia = createPinia();

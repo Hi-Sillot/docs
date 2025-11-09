@@ -139,7 +139,7 @@ export default defineUserConfig({
       replit: true,       // 启用嵌入 replit 语法 @[replit](user/repl-name)
       codeSandbox: true,  // 启用嵌入 codeSandbox 语法 @[codeSandbox](id)
       jsfiddle: true,     // 启用嵌入 jsfiddle 语法 @[jsfiddle](user/id)
-      npmTo: true,        // 启用 npm-to 容器  ::: npm-to
+      npmTo: ['pnpm', 'yarn', 'npm', 'bun', 'deno'],        // 启用 npm-to 容器  ::: npm-to
       demo: true,         // 启用 demo 容器  ::: demo
       repl: {             // 启用 代码演示容器
         go: true,         // ::: go-repl
