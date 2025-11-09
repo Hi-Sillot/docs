@@ -21,12 +21,12 @@ export default defineUserConfig({
   port:5858,
   base: '/',
   lang: 'zh-CN',
-  title: 'Sillot-Docs',
-  description: '汐洛文档',
+  title: '汐洛文档 🦢',
+  description: '平平淡淡才是真',
 
   head: [
     // 配置站点图标
-    ['link', { rel: 'icon', type: 'image/png', href: 'https://theme-plume.vuejs.press/favicon-32x32.png' }],
+    ['link', { rel: 'icon', type: 'image/ico', href: '../assets/icon.ico' }],
   ],
 
   bundler: viteBundler({
@@ -60,15 +60,15 @@ export default defineUserConfig({
 
   theme: plumeTheme({
     /* 添加您的部署域名, 有助于 SEO, 生成 sitemap */
-    // hostname: 'https://your_site_url',
+    hostname: 'https://sillot.hwd.deno.net/',
 
     /* 文档仓库配置，用于 editLink */
-    // docsRepo: '',
-    // docsDir: 'docs',
-    // docsBranch: '',
+    docsRepo: 'https://github.com/Hi-Sillot/docs',
+    docsDir: 'plume/docs',
+    docsBranch: 'main',
 
     /* 页内信息 */
-    // editLink: true,
+    editLink: true,
     lastUpdated: {},
     contributors: {
       mode: 'block',

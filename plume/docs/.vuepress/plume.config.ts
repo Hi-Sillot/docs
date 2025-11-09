@@ -18,7 +18,7 @@ import collections from './collections'
  * @see https://theme-plume.vuejs.press/config/basic/
  */
 export default defineThemeConfig({
-  logo: 'https://theme-plume.vuejs.press/plume.png',
+  logo: '../assets/icon.ico',
 
   appearance: true,  // 配置 深色模式
 
@@ -50,8 +50,8 @@ export default defineThemeConfig({
    */
   profile: {
     avatar: 'https://theme-plume.vuejs.press/plume.png',
-    name: 'Sillot-Docs',
-    description: '汐洛文档',
+    name: '佚名',
+    description: '平平淡淡才是真',
     // circle: true,
     // location: '',
     // organization: '',

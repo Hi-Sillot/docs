@@ -1,8 +1,15 @@
 import { defineClientConfig } from "vuepress/client";
 
+// 布局
 import Layout from "./layouts/Layout.vue";
 import AuthorDetail from "./layouts/AuthorDetail.vue";
 import AuthorList from "./layouts/AuthorList.vue";
+// 组件
+import BannerTopArchived from "./components/BannerTopArchived.vue"
+import BannerTopPrLock from "./components/BannerTopPrLock.vue"
+import BannerTopPrNeed from "./components/BannerTopPrNeed.vue"
+import VSCodeSettingsLink from "./components/VSCodeSettingsLink.vue"
+
 import { createPinia } from "pinia";
 import { useAuthorStore } from "./stores/author";
 import { useBioChainStore } from "./stores/bioChain";
@@ -25,6 +32,12 @@ export default defineClientConfig({
     // app.component('NpmBadge', NpmBadge)
     // app.component('NpmBadgeGroup', NpmBadgeGroup)
     // app.component('Swiper', Swiper) // you should install `swiper`
+
+    // 注册全局组件
+    app.component('BannerTopArchived', BannerTopArchived)
+    app.component('BannerTopPrLock', BannerTopPrLock)
+    app.component('BannerTopPrNeed', BannerTopPrNeed)
+    app.component('VSCodeSettingsLink', VSCodeSettingsLink)
 
     // 注册Pinia状态管理
     const pinia = createPinia();
