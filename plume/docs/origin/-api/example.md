@@ -1,8 +1,8 @@
 ---
 title: Example Reference
 description: A reference page in my new Starlight docs site.
-createTime: 2025/11/09 15:43:16
-permalink: /demo/mxmmmqqm/
+createTime: 2025/11/09 16:12:29
+permalink: /origin/mh50vzbr/
 ---
 
 Reference pages are ideal for outlining how things work in terse and clear terms.

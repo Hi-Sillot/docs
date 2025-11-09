@@ -13,7 +13,10 @@ export default defineNavbarConfig([
   { text: '归档', link: '/blog/archives/' },
   // { text: '原汐洛文档', link: '/origin/index.mdx' },
   {
-    text: '笔记',
-    items: [{ text: '示例', link: '/demo/README.md' }]
+    text: '更多',
+    items: [
+      { text: '示例', link: '/demo/README.md' },
+      { text: '原汐洛文档', link: '/origin/README.md' }
+    ]
   },
 ])

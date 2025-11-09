@@ -1,7 +1,7 @@
 ---
 title: callout
-createTime: 2025/11/09 15:43:16
-permalink: /demo/jt17262g/
+createTime: 2025/11/09 16:12:29
+permalink: /origin/sa486d4w/
 ---
 
 > https://github.com/orgs/community/discussions/16925

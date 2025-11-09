@@ -1,7 +1,7 @@
 ---
 title: docker
-createTime: 2025/11/09 15:43:16
-permalink: /demo/gftpr2bt/
+createTime: 2025/11/09 16:12:30
+permalink: /origin/hu2pshp8/
 ---
 推荐使用 [1Panel:  现代化、开源的 Linux 服务器运维管理面板](https://github.com/1Panel-dev/1Panel) 部署汐洛镜像。
 

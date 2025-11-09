@@ -1,7 +1,7 @@
 ---
 title: mode
-createTime: 2025/11/09 15:43:16
-permalink: /demo/2734m4ke/
+createTime: 2025/11/09 16:12:29
+permalink: /origin/37i4tnuw/
 ---
 
 ## 为什么某个包会被包含在模块依赖中
