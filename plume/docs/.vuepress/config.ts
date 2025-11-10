@@ -19,7 +19,7 @@ import AuthorPlugin from './plugins/Author/authorData'
 
 export default defineUserConfig({
   port:5858,
-  base: '/',
+  base: '/', // https://theme-plume.vuejs.press/guide/deployment/#github-pages
   lang: 'zh-CN',
   title: '汐洛文档 🦢',
   description: '平平淡淡才是真',
