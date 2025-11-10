@@ -2,8 +2,8 @@
 import {computed} from "vue";
 import { Layout } from 'vuepress-theme-plume/client'
 import Backlink from "../plugins/BiGraph/client/components/backlink.vue";
-import LocalRelationshipMap from "../plugins/BiGraph/client/components/localRelationshipMap.vue";
-import GlobalGraph from "../plugins/BiGraph/client/components/globalGraph.vue";
+import LocalGraph from "../plugins/BiGraph/client/components/LocalGraphView.vue";
+import GlobalGraph from "../plugins/BiGraph/client/components/GlobalGraphView.vue";
 import AuthorLink from "../plugins/Author/components/AuthorLink.vue";
 
 
@@ -24,7 +24,7 @@ const options = computed(() => {
       <backlink></backlink>
     </template>
     <template #aside-outline-before>
-      <local-relationship-map v-if="options.enableLocalGraph"></local-relationship-map>
+      <local-graph v-if="options.enableLocalGraph"></local-graph>
     </template>
     <template #doc-meta-before>
       <AuthorLink></AuthorLink>

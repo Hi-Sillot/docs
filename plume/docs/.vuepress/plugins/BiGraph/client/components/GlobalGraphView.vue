@@ -2,9 +2,9 @@
 import {computed, nextTick, Ref, ref, watch} from "vue";
 // import {getGlobalGraph, showGlobalGraph} from "../useGlobalGraph.js";
 import {CanvasSize, MapNodeLink} from "../../types/index.js";
-import RelationGraph from "./relationGraph.vue";
+import RelationGraph from "./RelationGraph.vue";
 import {useRouter, withBase} from "vuepress/client";
-import { useBioChainStore } from '../../../../stores/bioChain';
+import { useBioChainStore } from '../../../../stores/bioChain.js';
 const bioStore = useBioChainStore()
 
 declare const __VUEPRESS_DEV__: boolean;

@@ -1,7 +1,8 @@
 import type {BioChainMapItem, LocalMapItem, MapNodeLink, Page, QueueItem, TitleGetter} from "../types/index.js";
 import {fs, path} from "vuepress/utils";
 import {App} from "vuepress/core";
-import {options} from "./index";
+import { options } from "../config/options.js";
+// import {options} from "./index";
 // import {graphDataName} from "../client/useGlobalGraph.js";
 
 export const bioChainMap: Record<string, BioChainMapItem> = {};
@@ -29,7 +30,7 @@ function generateLocalMap(root: string): MapNodeLink {
         visited.add(path);
         localMap[path] = {
             title: bioChainMap[path].title,
-            path: path,
+            filePathRelative: path,
             htmlFilePathRelative: bioChainMap[path].htmlFilePathRelative,
             permalink: bioChainMap[path].permalink,
             outlink: [],
@@ -101,7 +102,7 @@ export function buildGlobalMap(): MapNodeLink {
             id: path,
             value: {
                 title: bioChainMap[path].title,
-                path: path,
+                filePathRelative: path,
                 htmlFilePathRelative: bioChainMap[path].htmlFilePathRelative,
             permalink: bioChainMap[path].permalink,
                 outlink: bioChainMap[path].outlink,

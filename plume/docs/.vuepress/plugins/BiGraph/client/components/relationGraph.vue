@@ -1,118 +1,25 @@
 <script setup lang="ts">
 import * as d3 from "d3";
 import { computed, onMounted, onUnmounted, ref, watch, nextTick } from "vue";
-import type {
-  CanvasSize,
-  Link,
-  MapNodeLink,
-  MousePosition,
-  Node,
-} from "../../types";
+import type { CanvasSize, MapLink, MapNodeLink, Node } from "../../types";
+import { useTheme } from "../composables/useTheme";
+import { useSimulation } from "../composables/useSimulation";
+import { DrawingManager } from "../composables/useDrawing";
+import { EventHandlers } from "../composables/useEventHandlers";
+import { PathUtils } from "../../utils/path-utils";
+import { CANVAS_CONFIG } from "../../constants";
+
+let TAG = "RelationGraph.vue";
+// 日志计数器
+let logCounter = 0;
+function log(step: string, data?: any) {
+  console.log(`${TAG} ${++logCounter}. [${step}]`, data ? data : '');
+}
 
 // 定义 emit 事件
 const emit = defineEmits<{
   (e: "nodeClick", path: string): void;
 }>();
-
-// 用于存储模拟程序的引用
-let simulation: d3.Simulation<Node, Link> | null = null;
-
-// 重启模拟程序的方法
-const restartSimulation = (): void => {
-  if (simulation) {
-    simulation
-      .alpha(FORCE_CONFIG.simulation.restart.alpha)
-      .alphaTarget(FORCE_CONFIG.simulation.restart.alphaTarget)
-      .restart();
-  }
-};
-
-// 暴露方法给外部使用
-defineExpose({
-  restartSimulation,
-});
-
-// 常量配置
-const CANVAS_CONFIG = {
-  defaultWidth: 300,
-  defaultHeight: 300,
-  nodeRadius: 5,
-  nodePadding: 5,
-  zoomExtent: [0.1, 10],
-  nodeClickRadius: 15,
-  hoverNodeRadius: 8,
-} as const;
-
-// 力导向图配置
-const FORCE_CONFIG = {
-  link: d3
-    .forceLink<Node, Link>()
-    .id((d: Node) => d.id)
-    .distance(100) // 调整连接线的距离
-    .strength(0.8), // 调整连接线的强度
-  charge: d3
-    .forceManyBody<Node>()
-    .strength((d: Node) => { return -40 - 180 * (d.linkCount-1 || 0) }) // 根据连接数调整电荷力
-    .distanceMin(10) // 最小距离
-    .distanceMax(400), // 最大距离
-  collision: d3
-    .forceCollide<Node>()
-    .radius(30) // 调整碰撞半径
-    .strength(0.7), // 调整碰撞力的强度
-  x: d3.forceX<Node>().strength((d: Node) => (d.isIsolated ? 0.02 : 0.1)), // 减小孤立节点的X轴中心力
-  y: d3.forceY<Node>().strength((d: Node) => (d.isIsolated ? 0.02 : 0.1)), // 减小孤立节点的Y轴中心力
-  simulation: {
-    alphaDecay: 0.003, // 增加alphaDecay，使得模拟更快停止
-    alphaMin: 0.001, // 设置alphaMin，避免无限刷新
-    velocityDecay: 0.6, // 调整速度衰减，使得节点移动更平滑
-    restart: {
-      alpha: 1,
-      alphaTarget: 0.3,
-      watchAlpha: 0.3,
-      dataChangeAlpha: 1,
-      dragEndAlphaTarget: 0,
-      dragEndAlpha: 0.3,
-    },
-  },
-} as const;
-
-// 样式配置
-const STYLE_CONFIG = {
-  link: {
-    color: "#aaa",
-    normalOpacity: 0.3,
-    highlightOpacity: 1,
-  },
-  node: {
-    normalOpacity: 0.3,
-    highlightOpacity: 0.8,
-  },
-  text: {
-    font: "12px 'Microsoft YaHei', 'Heiti SC', 'SimHei', -apple-system, sans-serif",
-    offset: 20,
-    minScale: 0.5,
-    maxScale: 1.5,
-  },
-  currentNode: {
-    strokeWidth: 2,
-  },
-} as const;
-
-// 添加路径匹配工具函数
-function isPathMatch(routePath: string, nodePath: string | null): boolean {
-  // 1. 码 URL 编码的字符
-  const decodedRoutePath = decodeURIComponent(routePath);
-
-  // 2. 移除两个路径的后缀（.html  .md 等）
-  const cleanRoutePath = decodedRoutePath.replace(/\.[^/.]+$/, "");
-  const cleanNodePath = nodePath?.replace(/\.[^/.]+$/, "");
-
-  // 3. 移除开头的斜杠
-  const normalizedRoutePath = cleanRoutePath.replace(/^\//, "");
-  const normalizedNodePath = cleanNodePath?.replace(/^\//, "");
-
-  return normalizedRoutePath === normalizedNodePath;
-}
 
 const props = defineProps<{
   data: MapNodeLink;
@@ -121,812 +28,424 @@ const props = defineProps<{
   canvasHeight: number;
 }>();
 
-// 将map_data改为响应式数据
-const map_data = ref<MapNodeLink>({
-  nodes: [],
-  links: [],
+log("组件初始化开始", { 
+  propsData: props.data, 
+  currentPath: props.currentPath,
+  canvasSize: { width: props.canvasWidth, height: props.canvasHeight }
 });
 
-// 添加初始化数据的函数
-function initializeMapData(data: MapNodeLink, currentPath?: string): void {
-  //校验
-  if (!data) {
-    console.warn("TypeError: data is undefined")
-    return
-  }
-  // 深拷贝数据以避免直接修改props
-  const newNodes = JSON.parse(JSON.stringify(data.nodes));
-  const newLinks = JSON.parse(JSON.stringify(data.links));
+// 响应式数据
+const map_data = ref<MapNodeLink>({ nodes: [], links: [] });
+const canvasRef = ref<HTMLCanvasElement | null>(null);
+const transform = ref(d3.zoomIdentity);
+const hoveredNode = ref<Node | null>(null);
+const mouseDownTime = ref(0);
+const mouseDownPosition = ref({ x: 0, y: 0 });
 
-  // 计算每个节点的连接数
-  newNodes.forEach((node) => {
-    node.linkCount = newLinks.reduce((count, link) => {
-      if (
-        (typeof link.source === "string" ? link.source : link.source.id) ===
-          node.id ||
-        (typeof link.target === "string" ? link.target : link.target.id) ===
-          node.id
-      ) {
-        count += 1;
-      }
-      return count;
+log("响应式数据定义完成", { 
+  initialMapData: map_data.value,
+  hasCanvasRef: !!canvasRef.value
+});
+
+// 计算属性
+const canvasSize = computed(() => {
+  const size = {
+    width: props.canvasWidth,
+    height: props.canvasHeight,
+  };
+  log("canvasSize 计算属性", size);
+  return size;
+});
+
+// 组合式函数
+log("开始初始化组合式函数");
+const { themeColors, setupThemeObserver } = useTheme();
+const { simulation, initializeSimulation, restartSimulation, updateForces } = 
+  useSimulation(canvasSize.value, map_data.value);
+log("组合式函数初始化完成", { 
+  hasSimulation: !!simulation.value,
+  themeColors: themeColors.value
+});
+
+// 数据验证和清理函数
+function validateAndCleanData(data: MapNodeLink): MapNodeLink {
+  log("开始数据验证和清理", { 
+    inputNodes: data.nodes.length, 
+    inputLinks: data.links.length 
+  });
+
+  const nodeIds = new Set(data.nodes.map(node => node.id));
+  log("节点ID集合", Array.from(nodeIds));
+
+  // 过滤无效链接（指向不存在的节点）
+  const validLinks = data.links.filter(link => {
+    const sourceId = typeof link.source === 'string' ? link.source : link.source.id;
+    const targetId = typeof link.target === 'string' ? link.target : link.target.id;
+    
+    const sourceExists = nodeIds.has(sourceId);
+    const targetExists = nodeIds.has(targetId);
+    
+    if (!sourceExists || !targetExists) {
+      console.warn(`无效链接被过滤: 源节点 ${sourceId} 存在=${sourceExists}, 目标节点 ${targetId} 存在=${targetExists}`);
+      return false;
+    }
+    
+    return true;
+  });
+
+  log("链接过滤完成", { 
+    原始链接数: data.links.length,
+    有效链接数: validLinks.length,
+    被过滤的链接数: data.links.length - validLinks.length
+  });
+
+  return {
+    nodes: data.nodes,
+    links: validLinks
+  };
+}
+
+// 路径匹配函数（处理VuePress永久链接）
+function findMatchingNode(nodes: Node[], path: string): Node | undefined {
+  // 直接匹配
+  let node = nodes.find(n => n.id === path || n.value.filePathRelative === path);
+  if (node) return node;
+
+  // 尝试处理VuePress永久链接：移除扩展名、处理特殊字符等
+  const normalizedPath = path
+    .replace(/\.md$/, '')
+    .replace(/\//g, '-')
+    .toLowerCase();
+  
+  node = nodes.find(n => {
+    const nodePath = n.id.replace(/\.md$/, '').replace(/\//g, '-').toLowerCase();
+    return nodePath === normalizedPath;
+  });
+
+  if (!node) {
+    console.warn(`未找到匹配的节点: ${path}`, { 
+      尝试的标准化路径: normalizedPath,
+      可用节点: nodes.map(n => n.id) 
+    });
+  }
+
+  return node;
+}
+
+// 初始化数据
+function initializeMapData(data: MapNodeLink, currentPath?: string): void {
+  log("initializeMapData 开始", { 
+    inputData: data, 
+    currentPath, 
+    currentMapData: map_data.value 
+  });
+
+  if (!data) {
+    console.warn("TypeError: data is undefined");
+    return;
+  }
+
+  // 数据验证和清理
+  const cleanedData = validateAndCleanData(data);
+  const newNodes = JSON.parse(JSON.stringify(cleanedData.nodes));
+  const newLinks = JSON.parse(JSON.stringify(cleanedData.links));
+
+  log("数据深拷贝完成", { 
+    nodeCount: newNodes.length, 
+    linkCount: newLinks.length 
+  });
+
+  // 确保链接引用正确的节点对象（而不是ID字符串）
+  const nodeMap = new Map(newNodes.map((node: { id: any; }) => [node.id, node]));
+  
+  const processedLinks = newLinks.map((link: { source: { id: any; }; target: { id: any; }; }) => {
+    const sourceId = typeof link.source === 'string' ? link.source : link.source.id;
+    const targetId = typeof link.target === 'string' ? link.target : link.target.id;
+    
+    const sourceNode = nodeMap.get(sourceId);
+    const targetNode = nodeMap.get(targetId);
+    
+    if (!sourceNode || !targetNode) {
+      console.error(`链接节点不存在: 源=${sourceId}, 目标=${targetId}`);
+      return null;
+    }
+    
+    return {
+      ...link,
+      source: sourceNode,
+      target: targetNode
+    };
+  }).filter(Boolean) as MapLink[];
+
+  log("链接处理完成", { 
+    处理后的链接数: processedLinks.length 
+  });
+
+  // 计算连接数
+  newNodes.forEach((node: Node) => {
+    node.linkCount = processedLinks.reduce((count: number, link: MapLink) => {
+      const sourceId = typeof link.source === "string" ? link.source : link.source.id;
+      const targetId = typeof link.target === "string" ? link.target : link.target.id;
+      return count + (sourceId === node.id || targetId === node.id ? 1 : 0);
     }, 0);
   });
 
-  // 标记孤立节点并设置初始位置
-  newNodes.forEach((node) => {
-    // 重置节点状态
+  log("节点连接数计算完成");
+
+  // 标记孤立节点
+  newNodes.forEach((node: Node) => {
     node.isCurrent = false;
     node.fx = null;
     node.fy = null;
 
-    node.isIsolated = !newLinks.some(
-      (link) =>
-        (typeof link.source === "string"
-          ? link.source === node.id
-          : link.source.id === node.id) ||
-        (typeof link.target === "string"
-          ? link.target === node.id
-          : link.target.id === node.id)
-    );
+    node.isIsolated = !processedLinks.some((link: MapLink) => {
+      const sourceId = typeof link.source === "string" ? link.source : link.source.id;
+      const targetId = typeof link.target === "string" ? link.target : link.target.id;
+      return sourceId === node.id || targetId === node.id;
+    });
 
-    // 设置节点的初始位置在画布中心
     node.x = canvasSize.value.width / 2;
     node.y = canvasSize.value.height / 2;
   });
 
+  log("孤立节点标记完成");
+
   // 设置当前节点
   if (currentPath) {
-    const currentNode = newNodes.find((node) =>
-      isPathMatch(currentPath, node.value.path)
-    );
+    const currentNode = findMatchingNode(newNodes, currentPath);
     if (currentNode) {
       currentNode.isCurrent = true;
+      log("当前节点设置", { currentNode: currentNode.id });
+    } else {
+      console.warn(`未找到当前路径对应的节点: ${currentPath}`);
     }
   }
 
-  // 更新响应式数据
-  map_data.value = {
-    nodes: newNodes,
-    links: newLinks,
-  };
+  const oldMapData = map_data.value;
+  map_data.value = { nodes: newNodes, links: processedLinks };
+  
+  log("map_data 更新完成", { 
+    oldNodeCount: oldMapData.nodes.length,
+    newNodeCount: map_data.value.nodes.length,
+    oldLinkCount: oldMapData.links.length,
+    newLinkCount: map_data.value.links.length
+  });
 }
 
-const canvasSize = computed<CanvasSize>(() => ({
-  width: props.canvasWidth,
-  height: props.canvasHeight,
-}));
+// 安全的模拟器初始化函数
+function initializeSimulationSafely(nodes: Node[], links: MapLink[]) {
+  log("开始安全初始化模拟器", { nodes: nodes.length, links: links.length });
+  
+  try {
+    // 再次验证数据
+    const nodeIds = new Set(nodes.map(n => n.id));
+    const validLinks = links.filter(link => {
+      const sourceId = typeof link.source === 'string' ? link.source : link.source.id;
+      const targetId = typeof link.target === 'string' ? link.target : link.target.id;
+      return nodeIds.has(sourceId) && nodeIds.has(targetId);
+    });
 
-const canvasRef = ref<HTMLCanvasElement | null>(null);
-const mouseDownTime = ref<number>(0);
-const mouseDownPosition = ref<MousePosition>({
-  x: 0,
-  y: 0,
-});
+    log("模拟器初始化前的最终验证", {
+      原始链接数: links.length,
+      有效链接数: validLinks.length
+    });
 
-// 添加颜色存储
-const themeColors = ref({
-  accent: "",
-  text: "",
-  // 记录实际使用的CSS变量名,用于后续监听
-  cssVariableName: {
-    accent: "",
-    text: "",
-  },
-});
-
-// 修改获取主题色函数
-function initThemeColors(): void {
-  const root = getComputedStyle(document.documentElement);
-
-  // 获取accent颜色
-  if (root.getPropertyValue("--vp-c-accent").trim()) {
-    themeColors.value.accent = root.getPropertyValue("--vp-c-accent").trim();
-    themeColors.value.cssVariableName.accent = "--vp-c-accent";
-  } else if (root.getPropertyValue("--theme-color").trim()) {
-    themeColors.value.accent = root.getPropertyValue("--theme-color").trim();
-    themeColors.value.cssVariableName.accent = "--theme-color";
-  } else {
-    themeColors.value.accent = "#299764";
-    themeColors.value.cssVariableName.accent = "";
-  }
-
-  // 获取text颜色
-  if (root.getPropertyValue("--vp-c-text").trim()) {
-    themeColors.value.text = root.getPropertyValue("--vp-c-text").trim();
-    themeColors.value.cssVariableName.text = "--vp-c-text";
-  } else if (root.getPropertyValue("--text-color").trim()) {
-    themeColors.value.text = root.getPropertyValue("--text-color").trim();
-    themeColors.value.cssVariableName.text = "--text-color";
-  } else {
-    themeColors.value.text = "#000000";
-    themeColors.value.cssVariableName.text = "";
+    const sim = initializeSimulation(nodes, validLinks);
+    log("模拟器初始化成功");
+    return sim;
+  } catch (error) {
+    console.error("模拟器初始化失败:", error);
+    
+    // 返回一个最小化的安全模拟器
+    const safeSim = d3.forceSimulation(nodes)
+      .force("charge", d3.forceManyBody().strength(-100))
+      .force("center", d3.forceCenter(canvasSize.value.width / 2, canvasSize.value.height / 2));
+    
+    log("创建了安全模拟器作为备选方案");
+    return safeSim;
   }
 }
 
+// 绘制函数
+let drawingManager: DrawingManager | null = null;
+let tickCount = 0;
+
+function ticked(): void {
+  tickCount++;
+  if (tickCount <= 5) {
+    log(`ticked #${tickCount}`, { 
+      hasCanvas: !!canvasRef.value, 
+      hasDrawingManager: !!drawingManager,
+      nodeCount: map_data.value.nodes.length 
+    });
+  }
+
+  if (!canvasRef.value || !drawingManager) return;
+  
+  const context = canvasRef.value.getContext("2d");
+  if (!context) return;
+
+  drawingManager.clearCanvas(canvasSize.value);
+  drawingManager.applyTransform();
+  drawingManager.drawLinks(map_data.value.links);
+  drawingManager.drawNodes(map_data.value.nodes);
+  drawingManager.drawLabels(map_data.value.nodes);
+  drawingManager.restoreTransform();
+}
+
+// 事件处理
+let eventHandlers: EventHandlers | null = null;
+
+function setupEventListeners(): void {
+  log("setupEventListeners 开始", { 
+    hasCanvas: !!canvasRef.value, 
+    hasSimulation: !!simulation.value 
+  });
+
+  if (!canvasRef.value || !simulation.value) return;
+
+  const zoom = d3
+    .zoom<HTMLCanvasElement, unknown>()
+    .scaleExtent(CANVAS_CONFIG.zoomExtent)
+    .filter((event: d3.D3ZoomEvent<HTMLCanvasElement, unknown>) => 
+      eventHandlers?.filterZoomEvent(event) ?? true
+    )
+    .touchable(true)
+    .on("zoom", (event: d3.D3ZoomEvent<HTMLCanvasElement, unknown>) => {
+      transform.value = event.transform;
+      if (drawingManager) {
+        drawingManager.setTransform(transform.value);
+      }
+      ticked();
+    });
+
+  d3.select(canvasRef.value).call(zoom);
+
+  eventHandlers = new EventHandlers(
+    canvasRef.value,
+    simulation.value,
+    transform.value,
+    map_data.value.nodes,
+    map_data.value.links,
+    canvasSize.value
+  );
+
+  canvasRef.value.addEventListener("mousedown", (e) => eventHandlers?.onMouseDown(e));
+  
+  log("事件监听设置完成");
+}
+
+// 生命周期
 onMounted(() => {
-  // 初始化颜色
-  initThemeColors();
-
-  // 初始化数据
-  initializeMapData(props.data, props.currentPath);
-
-  // 设置 MutationObserver 监听样式变化
-  const styleObserver = new MutationObserver(() => {
-    const root = getComputedStyle(document.documentElement);
-    let shouldUpdate = false;
-    // 只检查实际使用的CSS变量
-    if (themeColors.value.cssVariableName.accent) {
-      const newAccent = root
-        .getPropertyValue(themeColors.value.cssVariableName.accent)
-        .trim();
-      if (newAccent !== themeColors.value.accent) {
-        shouldUpdate = true;
-      }
-    }
-
-    if (themeColors.value.cssVariableName.text) {
-      const newText = root
-        .getPropertyValue(themeColors.value.cssVariableName.text)
-        .trim();
-      if (newText !== themeColors.value.text) {
-        shouldUpdate = true;
-      }
-    }
-
-    if (shouldUpdate) {
-      initThemeColors();
-      // 触发重绘
-      if (simulation) {
-        ticked();
-      }
-    }
-  });
-
-  styleObserver.observe(document.documentElement, {
-    attributes: true,
-    attributeFilter: ["style", "class", "data-theme"],
-  });
-
-  // 组件卸载时清理observer
-  onUnmounted(() => {
-    styleObserver.disconnect();
-  });
-
-  if (!map_data.value) {
+  log("onMounted 开始执行");
+  
+  if (!canvasRef.value) {
+    log("canvasRef 为空，中止挂载");
     return;
   }
-  // 初始化变量
-  // const canvas = canvasRef.value as HTMLCanvasElement;
-  // const context = canvas.getContext("2d") as CanvasRenderingContext2D;
-  const canvas = canvasRef.value;
-  if (!canvas) return; // 避免canvas未挂载时执行后续逻辑
-  const context = canvas.getContext("2d");
-  if (!context) return; // 避免浏览器不支持2d上下文的情况
-  let isDragging: boolean = false;
-  let draggingNode: Node | null = null;
-  let transform: d3.ZoomTransform = d3.zoomIdentity;
-  let hoveredNode: Node | null = null;
-  let observer: MutationObserver | null = null;
 
-  // 事件监听器设置
-  function setupEventListeners(): void {
-    const zoom = d3
-      .zoom<HTMLCanvasElement, unknown>()
-      .scaleExtent(CANVAS_CONFIG.zoomExtent as [number, number])
-      .filter((event) => filterZoomEvent(event))
-      .touchable(true)
-      .on("zoom", (event: d3.D3ZoomEvent<HTMLCanvasElement, unknown>) => {
-        transform = event.transform;
-        ticked();
-      });
-
-    const touchOptions: AddEventListenerOptions = {
-      passive: true,
-      capture: false,
-    };
-
-    d3.select<HTMLCanvasElement, unknown>(canvas)
-      .on("touchstart touchmove", null)
-      .call(zoom);
-
-    if (canvas) {
-    canvas.addEventListener("mousedown", onMouseDown);
-    canvas.addEventListener("touchstart", onMouseDown, touchOptions);
-    canvas.addEventListener("click", onClick);
-    canvas.addEventListener("touchend", onClick);
-    canvas.addEventListener("mousemove", onCanvasMouseMove);
-    canvas.addEventListener("touchmove", onCanvasMouseMove, touchOptions);
-    canvas.addEventListener("mouseleave", onCanvasMouseLeave);
-    canvas.addEventListener("touchend", onCanvasMouseLeave);
-    }
+  const context = canvasRef.value.getContext("2d");
+  if (!context) {
+    log("获取 canvas 上下文失败");
+    return;
   }
 
-  // 初始化 observer
-  observer = new MutationObserver(() => {
-    if (canvas && context) {
-      ticked();
-    }
+  log("Canvas 上下文获取成功");
+
+  // 初始化绘制管理器
+  drawingManager = new DrawingManager(context, themeColors.value, transform.value);
+  log("DrawingManager 初始化完成");
+
+  // 初始化数据
+  log("开始初始化地图数据");
+  initializeMapData(props.data, props.currentPath);
+
+  // 设置主题观察器
+  const styleObserver = setupThemeObserver(ticked);
+  onUnmounted(() => {
+    log("组件卸载，断开主题观察器");
+    styleObserver.disconnect();
   });
+  log("主题观察器设置完成");
 
-  // 观察 html 元素的 style 属性
-  observer.observe(document.documentElement, {
-    attributes: true,
-    attributeFilter: ["style", "class", "data-theme"],
-  });
+  // 安全初始化模拟器
+  log("开始安全初始化模拟器");
+  simulation.value = initializeSimulationSafely(map_data.value.nodes, map_data.value.links);
+  simulation.value.on("tick", ticked);
+  log("模拟器初始化完成", { simulation: simulation.value });
 
-  // 清理函数
-  const cleanup = (): void => {
-    if (observer) {
-      observer.disconnect();
-    }
-    if (simulation) {
-      simulation.stop();
-    }
-    // 移除所有事件监听器
-    canvas.removeEventListener("mousedown", onMouseDown);
-    canvas.removeEventListener("click", onClick);
-    canvas.removeEventListener("mousemove", onCanvasMouseMove);
-    canvas.removeEventListener("mouseleave", onCanvasMouseLeave);
-    canvas.removeEventListener("touchstart", onMouseDown);
-    canvas.removeEventListener("touchend", onClick);
-    canvas.removeEventListener("touchmove", onCanvasMouseMove);
-    canvas.removeEventListener("touchend", onCanvasMouseLeave);
-    d3.select(canvas).on(".zoom", null);
-  };
-
-  // 在组件卸载时调用清理函数
-  onUnmounted(cleanup);
-
-  // 初始化力导向图
-  simulation = initializeSimulation();
   // 设置事件监听
+  log("开始设置事件监听");
   setupEventListeners();
 
-  // 力导图初始化
-  function initializeSimulation(): d3.Simulation<Node, Link> {
-    // 标记孤立节点
-    map_data.value.nodes.forEach((node) => {
-      node.isIsolated = !map_data.value.links.some(
-        (link) =>
-          (typeof link.source === "string"
-            ? link.source === node.id
-            : link.source === node) ||
-          (typeof link.target === "string"
-            ? link.target === node.id
-            : link.target === node)
-      );
+  // 暴露方法
+  //@ts-ignore
+  window.simulation = simulation.value;
+  log("onMounted 执行完成");
+});
 
-      // 设置节点的初始位置在画布中心
-      node.x = canvasSize.value.width / 2;
-      node.y = canvasSize.value.height / 2;
-    });
-
-    // 创建一个 center force
-    const centerForce = d3
-      .forceCenter<Node>(
-        canvasSize.value.width / 2,
-        canvasSize.value.height / 2
-      )
-      .strength(0.002);
-
-   return d3
-      .forceSimulation<Node>(map_data.value.nodes)
-      .force("link", FORCE_CONFIG.link.links(map_data.value.links))
-      .force("charge", FORCE_CONFIG.charge)
-      .force("collision", FORCE_CONFIG.collision)
-      .force("center", centerForce)
-      .force("x", FORCE_CONFIG.x.x(canvasSize.value.width / 2))
-      .force("y", FORCE_CONFIG.y.y(canvasSize.value.height / 2))
-      .alphaDecay(FORCE_CONFIG.simulation.alphaDecay)
-      .alphaMin(FORCE_CONFIG.simulation.alphaMin)
-      .velocityDecay(FORCE_CONFIG.simulation.velocityDecay)
-      .on("tick", () => {
-        ticked();
-      });
-
+onUnmounted(() => {
+  log("onUnmounted 开始执行");
+  if (simulation.value) {
+    simulation.value.stop();
+    log("模拟器已停止");
   }
+  log("组件卸载完成");
+});
 
-  // 事件处理数
-  function filterZoomEvent(
-    event: d3.D3ZoomEvent<HTMLCanvasElement, unknown>
-  ): boolean {
-    // 获取原始事件
-    const sourceEvent = event.sourceEvent || event;
-
-    // 如果是触摸事件，需要检查触摸点是否在节点上
-    if (canvas && sourceEvent.type === "touchstart") {
-      const touch = sourceEvent.touches[0];
-      const rect = canvas.getBoundingClientRect();
-      const x = (touch.clientX - rect.left - transform.x) / transform.k;
-      const y = (touch.clientY - rect.top - transform.y) / transform.k;
-      const node = simulation.find(x, y, CANVAS_CONFIG.nodeClickRadius);
-      return !node; // 如果触摸点在节点上，阻止缩放
-    }
-    // 对于鼠标事件保持原有逻辑
-    if (sourceEvent.type === "mousedown") {
-      const [x, y] = transform.invert(d3.pointer(sourceEvent, canvas));
-      return !isMouseOverNode(x, y) && !draggingNode;
-    }
-    return true;
+// 监听器
+watch(() => canvasSize.value, (newSize, oldSize) => {
+  log("canvasSize 变化", { oldSize, newSize });
+  updateForces();
+  if (simulation.value) {
+    simulation.value.alpha(0.3).restart();
+    log("模拟器重启");
   }
+});
 
-  function onMouseDown(event: MouseEvent | TouchEvent): void {
-    if (event.type === "touchstart") {
-      event.preventDefault();
-    }
-
-    const point = (event as TouchEvent).touches
-      ? (event as TouchEvent).touches[0]
-      : (event as MouseEvent);
-    const [x, y] = transform.invert(d3.pointer(point, canvas));
-    const foundNode = simulation.find(x, y, CANVAS_CONFIG.nodeClickRadius);
-    draggingNode = foundNode ?? null; // 若未找到节点，赋值为null
-
-    // 记录按下时的时间和位置
-    mouseDownTime.value = Date.now();
-    mouseDownPosition.value = {
-      x: point.clientX,
-      y: point.clientY,
-    };
-
-    if (draggingNode) {
-      // 设置当前拖拽的节点为悬停节点
-      hoveredNode = draggingNode;
-
-      event.stopPropagation();
-      document.body.style.userSelect = "none";
-      draggingNode.fx = x;
-      draggingNode.fy = y;
-      simulation
-        .alphaTarget(FORCE_CONFIG.simulation.restart.alphaTarget)
-        .restart();
-
-      const touchOptions: AddEventListenerOptions = {
-        passive: false,
-        capture: false,
-      };
-
-      // 根据事件类型绑定对应的事件监听器
-      if ((event as TouchEvent).touches) {
-        window.addEventListener("touchmove", onMouseMove, touchOptions);
-        window.addEventListener("touchend", onMouseUp);
-      } else {
-        window.addEventListener("mousemove", onMouseMove);
-        window.addEventListener("mouseup", onMouseUp);
-      }
-    }
-  }
-
-  // 处理鼠标移动事件
-  function onMouseMove(event: MouseEvent | TouchEvent) {
-  if (draggingNode && canvas) {
-    let point: MouseEvent | Touch;
-    // 类型守卫：判断是否为触摸事件
-    if (event instanceof TouchEvent) {
-      // 触摸事件取第一个触摸点
-      point = event.touches?.[0];
-    } else {
-      // 鼠标事件直接使用event本身
-      point = event;
-    }
-
-    if (!point) return; // 处理无效的触摸点或事件
-
-    // 计算移动距离
-    const moveDistance = Math.sqrt(
-      Math.pow(point.clientX - mouseDownPosition.value.x, 2) +
-      Math.pow(point.clientY - mouseDownPosition.value.y, 2)
-    );
-
-    // 只有当移动距离大于5像素时才开始拖拽
-    if (moveDistance > 5) {
-      isDragging = true;
-      const rect = canvas.getBoundingClientRect();
-      // 计算相对于画布的坐标（需确保canvas和context已正确获取）
-      const x = (point.clientX - rect.left - transform.x) / transform.k;
-      const y = (point.clientY - rect.top - transform.y) / transform.k;
-
-      // 获取边界内的位置并更新节点位置
-      const boundedPosition = getBoundedPosition(x, y);
-      updateDraggingNodePosition(boundedPosition);
-      simulation.alphaTarget(FORCE_CONFIG.simulation.restart.alphaTarget);
-    }
-    event.preventDefault();
-  }
-}
-
-// 处理鼠标松开事件
-function onMouseUp(event: MouseEvent | TouchEvent) {
-  if (draggingNode) {
-    // 清除节点的固定位置
-    draggingNode.fx = null;
-    draggingNode.fy = null;
-    document.body.style.userSelect = "";
-    // 清除悬停节点和拖拽节点
-    hoveredNode = null;
-    draggingNode = null;
-    simulation
-      .alphaTarget(FORCE_CONFIG.simulation.restart.dragEndAlphaTarget)
-      .alpha(FORCE_CONFIG.simulation.restart.dragEndAlpha);
-
-    // 类型守卫：判断事件类型
-    if (event instanceof TouchEvent) {
-      // 触摸事件：移除触摸相关监听器
-      window.removeEventListener("touchmove", onMouseMove as EventListener);
-      window.removeEventListener("touchend", onMouseUp as EventListener);
-    } else {
-      // 鼠标事件：移除鼠标相关监听器
-      window.removeEventListener("mousemove", onMouseMove as EventListener);
-      window.removeEventListener("mouseup", onMouseUp as EventListener);
-    }
-  }
-}
-
-
-  // 获取边界内的位置
-  function getBoundedPosition(x, y) {
-    // 计算边界范围
-    const bounds = {
-      left: -transform.x / transform.k,
-      top: -transform.y / transform.k,
-      right: (canvasSize.value.width - transform.x) / transform.k,
-      bottom: (canvasSize.value.height - transform.y) / transform.k,
-    };
-
-    // 返回限在边界内的坐标
-    return {
-      x: Math.max(
-        bounds.left + CANVAS_CONFIG.nodePadding,
-        Math.min(bounds.right - CANVAS_CONFIG.nodePadding, x)
-      ),
-      y: Math.max(
-        bounds.top + CANVAS_CONFIG.nodePadding,
-        Math.min(bounds.bottom - CANVAS_CONFIG.nodePadding, y)
-      ),
-    };
-  }
-
-  // 更新拖拽节点的位置
-  function updateDraggingNodePosition({ x, y }) {
-    if (draggingNode) {
-    draggingNode.x = x;
-    draggingNode.y = y;
-    draggingNode.fx = x;
-    draggingNode.fy = y;
-    }
-  }
-
-  // 渲染相关函数
-  // 每帧更新画布内容
-  function ticked() {
-    if (!context) return; // 避免浏览器不支持2d上下文的情况
-    context.clearRect(0, 0, canvasSize.value.width, canvasSize.value.height);
-    context.save();
-    applyTransform();
-    drawLinks();
-    drawNodes();
-    drawLabels();
-    context.restore();
-  }
-
-  // 应用坐标变换
-  function applyTransform() {
-    if (!context) return; // 避免浏览器不支持2d上下文的情况
-    context.translate(transform.x, transform.y);
-    context.scale(transform.k, transform.k);
-  }
-
-  // 绘制连接线
-  function drawLink(d) {
-    if (!context) return; // 避免浏览器不支持2d上下文的情况
-    context.moveTo(d.source.x, d.source.y);
-    context.lineTo(d.target.x, d.target.y);
-  }
-
-  // 绘制节点
-  function drawNode(d, baseRadius) {
-    if (!context) return; // 避免浏览器不支持2d上下文的情况
-    const linkCountBonus = Math.max(0, d.linkCount - 1) * 0.4;
-    const radius = baseRadius + linkCountBonus; // 基础半径加上点连接数的倍数
-    context.moveTo(d.x + radius, d.y);
-    context.arc(d.x, d.y, radius, 0, 2 * Math.PI);
-  }
-
-  // 检查鼠标是否在节点上
-  function isMouseOverNode(x, y) {
-    return map_data.value.nodes.some((node) => {
-      const dx = node.x - x;
-      const dy = node.y - y;
-      return Math.sqrt(dx * dx + dy * dy) < CANVAS_CONFIG.nodeClickRadius;
-    });
-  }
-
-  // 处理点击事件
-  function onClick(event) {
-    // 获取点击位置
-    const point = event.changedTouches ? event.changedTouches[0] : event;
-
-    // 计算点击持续时间和移动距离
-    const clickDuration = Date.now() - mouseDownTime.value;
-    const moveDistance = Math.sqrt(
-      Math.pow(point.clientX - mouseDownPosition.value.x, 2) +
-        Math.pow(point.clientY - mouseDownPosition.value.y, 2)
-    );
-
-    // 判断是否为有效点击（时间短且移动距离小）
-    if (canvas && clickDuration < 300 && moveDistance < 5) {
-      const rect = canvas.getBoundingClientRect();
-      const x = (point.clientX - rect.left - transform.x) / transform.k;
-      const y = (point.clientY - rect.top - transform.y) / transform.k;
-      const clickedNode = simulation.find(x, y, CANVAS_CONFIG.nodeClickRadius);
-
-      // 如果点击了非当前节点，触发节点点击事件
-      if (clickedNode && !isDragging) {
-        if (!clickedNode.isCurrent) {
-          emit("nodeClick", clickedNode.value.path);
-        }
-      }
-    }
-
-    isDragging = false;
-  }
-
-  function onCanvasMouseMove(event: MouseEvent | TouchEvent): void {
-    if (draggingNode || !canvas) {
-      return;
-    }
-
-    const point = (event as TouchEvent).touches
-      ? (event as TouchEvent).touches[0]
-      : (event as MouseEvent);
-    const rect = canvas.getBoundingClientRect();
-    const x = (point.clientX - rect.left - transform.x) / transform.k;
-    const y = (point.clientY - rect.top - transform.y) / transform.k;
-    const node = simulation.find(x, y, CANVAS_CONFIG.nodeClickRadius);
-
-    if (node !== hoveredNode) {
-      hoveredNode = node;
-      ticked(); // 重新渲染
-    }
-  }
-
-  function onCanvasMouseLeave(): void {
-    if (hoveredNode) {
-      hoveredNode = null;
-      ticked(); // 重新渲染
-    }
-  }
-
-  // 修改 drawLinks 函数
-  function drawLinks(): void {
-    if (!context) return; // 避免浏览器不支持2d上下文的情况
-    const { accent } = themeColors.value;
-
-    map_data.value.links.forEach((link) => {
-      context.beginPath();
-      drawLink(link);
-
-      if (
-        hoveredNode &&
-        (link.source === hoveredNode || link.target === hoveredNode)
-      ) {
-        context.strokeStyle = accent;
-        context.globalAlpha = STYLE_CONFIG.link.highlightOpacity;
-      } else {
-        context.strokeStyle = STYLE_CONFIG.link.color;
-        context.globalAlpha = hoveredNode
-          ? STYLE_CONFIG.link.normalOpacity
-          : STYLE_CONFIG.link.highlightOpacity;
-      }
-
-      context.stroke();
-    });
-    context.globalAlpha = 1;
-  }
-
-  // 修改 drawNodes 函数
-  function drawNodes(): void {
-    if (!context) return; // 避免浏览器不支持2d上下文的情况
-    const { accent, text } = themeColors.value;
-
-    // 获与悬停点相连的点
-    const connectedNodes = new Set<Node>();
-    if (hoveredNode) {
-      map_data.value.links.forEach((link) => {
-        if (link.source === hoveredNode) {
-          connectedNodes.add(link.target as Node);
-        }
-        if (link.target === hoveredNode) {
-          connectedNodes.add(link.source as Node);
-        }
-      });
-    }
-
-    // 先绘制所有普通节点（包括孤立节点）
-    context.beginPath();
-    map_data.value.nodes
-      .filter((d) => !d.isCurrent && d !== hoveredNode)
-      .forEach((d) => {
-        drawNode(d, CANVAS_CONFIG.nodeRadius);
-      });
-    context.fillStyle = text;
-    context.globalAlpha = hoveredNode
-      ? STYLE_CONFIG.node.normalOpacity
-      : STYLE_CONFIG.node.highlightOpacity;
-    context.fill();
-
-    // 如果有悬停节点，绘制与其相连的节点
-    if (hoveredNode) {
-      context.beginPath();
-      Array.from(connectedNodes).forEach((d) => {
-        if (!d.isCurrent) {
-          drawNode(d, CANVAS_CONFIG.nodeRadius);
-        }
-      });
-      context.fillStyle = text;
-      context.globalAlpha = STYLE_CONFIG.node.highlightOpacity;
-      context.fill();
-    }
-
-    // 绘制悬停节点
-    if (hoveredNode && !hoveredNode.isCurrent) {
-      context.beginPath();
-      drawNode(hoveredNode, CANVAS_CONFIG.hoverNodeRadius);
-      context.fillStyle = accent;
-      context.globalAlpha = STYLE_CONFIG.node.highlightOpacity;
-      context.fill();
-    }
-
-    // 绘制当前节点
-    const currentNode = map_data.value.nodes.find((d) => d.isCurrent);
-    if (currentNode) {
-      context.beginPath();
-      drawNode(
-        currentNode,
-        currentNode === hoveredNode
-          ? CANVAS_CONFIG.hoverNodeRadius
-          : CANVAS_CONFIG.nodeRadius
-      );
-      context.fillStyle = accent;
-      context.globalAlpha =
-        hoveredNode &&
-        currentNode !== hoveredNode &&
-        !connectedNodes.has(currentNode)
-          ? STYLE_CONFIG.node.normalOpacity
-          : STYLE_CONFIG.node.highlightOpacity;
-      context.fill();
-    }
-
-    // 恢复默认透明度
-    context.globalAlpha = 1;
-  }
-
-  // 修改 drawLabels 函数
-  function drawLabels(): void {
-    if (!context) return; // 避免浏览器不支持2d上下文的情况
-    context.font = STYLE_CONFIG.text.font;
-    const { text } = themeColors.value;
-
-    // 获取与悬停节点相连的节点集合
-    const connectedNodes = new Set<Node>();
-    if (hoveredNode) {
-      map_data.value.links.forEach((link) => {
-        if (link.source === hoveredNode) {
-          connectedNodes.add(link.target as Node);
-        }
-        if (link.target === hoveredNode) {
-          connectedNodes.add(link.source as Node);
-        }
-      });
-    }
-
-    map_data.value.nodes.forEach((node) => {
-      let shouldDrawText = false;
-      let opacity = 1;
-      // 计算节点的动态视觉半径 (不包括悬停时的放大效果)
-      const visualNodeRadius = CANVAS_CONFIG.nodeRadius + Math.max(0, node.linkCount - 1) * 0.4;
-
-      if (transform.k > STYLE_CONFIG.text.minScale) {
-        shouldDrawText = true;
-        opacity = Math.min(
-          (transform.k - STYLE_CONFIG.text.minScale) /
-            (STYLE_CONFIG.text.maxScale - STYLE_CONFIG.text.minScale),
-          1
-        );
-
-        // 如果有悬停节点，调整透明度
-        if (hoveredNode) {
-          if (node === hoveredNode || connectedNodes.has(node)) {
-          } else {
-            opacity = opacity * STYLE_CONFIG.node.normalOpacity; // 降低非相关节点的文字透明度
-          }
-        }
-      }
-
-      if (shouldDrawText) {
-        const textWidth = context.measureText(node.value.title).width;
-        context.fillStyle = text;
-        context.globalAlpha = opacity;
-        context.fillText(
-          node.value.title,
-          node.x - textWidth / 2,
-          node.y + STYLE_CONFIG.text.offset + visualNodeRadius
-        );
-        context.globalAlpha = 1; // 恢复默认透明度
-      }
-    });
-  }
-
-  // 模拟一次拖拽过程
-  nextTick(() => {
-    if (simulation) {
-      // 模拟拖拽开始
-      simulation
-        .alphaTarget(FORCE_CONFIG.simulation.restart.alphaTarget)
-        .restart();
-
-      // 延迟一小段时间后模拟拖拽结束
-      setTimeout(() => {
-        simulation
-          .alphaTarget(FORCE_CONFIG.simulation.restart.dragEndAlphaTarget)
-          .alpha(FORCE_CONFIG.simulation.restart.dragEndAlpha);
-      }, 100); // 100ms 后执行拖拽结束
-    }
+watch([() => props.data, () => props.currentPath], ([newData, newPath], [oldData, oldPath]) => {
+  log("props.data 或 props.currentPath 变化", { 
+    oldData, 
+    newData, 
+    oldPath, 
+    newPath,
+    currentMapData: map_data.value
   });
-});
-declare global {
-  // @ts-ignore
-  interface Window {
-    simulation: d3.Simulation<Node, Link>;
+
+  if (!newData) {
+    log("新数据为空，跳过更新");
+    return;
   }
-}
-watch(
-  () => canvasSize.value,
-  (): void => {
-    if (simulation) {
-      const centerForce = d3
-        .forceCenter<Node>(
-          canvasSize.value.width / 2,
-          canvasSize.value.height / 2
-        )
-        .strength(0.002);
-      simulation
-        .force("center", centerForce)
-        .force("x", FORCE_CONFIG.x.x(canvasSize.value.width / 2))
-        .force("y", FORCE_CONFIG.y.y(canvasSize.value.height / 2));
-      simulation
-        .alpha(FORCE_CONFIG.simulation.restart.watchAlpha)
-        .restart();
+
+  log("开始更新地图数据");
+  initializeMapData(newData, newPath);
+  
+  if (simulation.value) {
+    // 安全地更新模拟器
+    simulation.value.nodes(map_data.value.nodes);
+    
+    try {
+      simulation.value.force("link", 
+        d3.forceLink(map_data.value.links)
+          .id((d: any) => d.id)
+          .distance(100)
+      );
+      
+      simulation.value.alpha(1).restart();
+      log("模拟器已更新并重启", { 
+        nodeCount: map_data.value.nodes.length,
+        linkCount: map_data.value.links.length
+      });
+    } catch (error) {
+      console.error("更新模拟器时出错:", error);
+      // 即使出错也继续运行，只是不重启模拟器
     }
   }
-);
-
-// 添加组件卸载时的清理
-onUnmounted((): void => {
-  if (simulation) {
-    simulation.stop();
-  }
 });
 
-// 合并 data 和 currentPath 的监听
-watch(
-  [() => props.data, () => props.currentPath],
-  ([newData, newPath]: [MapNodeLink, string | undefined]) => {
-    if (!newData || !simulation) return;
-
-    // 初始化新数据
-    initializeMapData(newData, newPath);
-
-    // 更新模拟器的节点和连接
-    simulation
-      .nodes(map_data.value.nodes)
-      .force("link", FORCE_CONFIG.link.links(map_data.value.links));
-
-    // 重启模拟
-    simulation.alpha(FORCE_CONFIG.simulation.restart.dataChangeAlpha).restart();
-  }
-);
+// 暴露方法
+defineExpose({ restartSimulation });
+log("组件定义完成");
 </script>
 
 <template>
@@ -938,6 +457,7 @@ watch(
       width: canvasSize.width + 'px',
       height: canvasSize.height + 'px',
     }"
+    @click="log('canvas 点击事件')"
   ></canvas>
 </template>
 

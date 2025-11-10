@@ -53,8 +53,8 @@ export default defineUserConfig({
     BiGraph({
       localGraphDeep: 20,
       foldEmptyGraph: false, // 无链接时不隐藏，方便打开全局图
-      graphMaxWidth: 200,
-      graphHeight: 200,
+      graphMaxWidth: 250,
+      graphHeight: 220,
   }),
     revealJsPlugin({
       // 插件选项
