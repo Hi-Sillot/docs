@@ -26,6 +26,7 @@ export default defineNavbarConfig([
       { text: '示例', link: '/demo/README.md' },
       { text: '原汐洛文档', link: '/col_doc/origin/README.md' },
       { text: '数据统计', link: '/col_doc/4_stats/README.md' },
+      { text: '友链', link: '/friends/' },
     ]
   },
 ])

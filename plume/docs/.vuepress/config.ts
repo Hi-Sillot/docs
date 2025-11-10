@@ -79,7 +79,15 @@ export default defineUserConfig({
     contributors: {
       mode: 'block',
     },
-    changelog: true,
+    changelog: {
+      maxCount: 10,
+    },
+
+    plugins: {
+      // 如果您在此处直接声明为 true，则表示开发环境和生产环境都启用该功能
+      git: true // 项目大到感知强烈时禁用
+      // git: process.env.NODE_ENV === 'production'
+    },
 
     /**
      * 编译缓存，加快编译速度
