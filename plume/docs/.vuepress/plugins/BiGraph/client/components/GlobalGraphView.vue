@@ -8,14 +8,7 @@ import { useBioChainStore } from '../../../../stores/bioChain.js';
 const bioStore = useBioChainStore()
 
 declare const __VUEPRESS_DEV__: boolean;
-// declare const __RELATIONAL_GRAPH_GRAPH_PATH: { target: string };
-// const options = computed(() => {
-//   return {
-//     isDev: __VUEPRESS_DEV__,
-//     graphPath: __RELATIONAL_GRAPH_GRAPH_PATH,
 
-//   };
-// });
 const first_loaded = ref(false);
 const data: Ref<MapNodeLink | null> = ref(null);
 let is_loading = false;

@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import {computed} from "vue";
 import { Layout } from 'vuepress-theme-plume/client'
-import Backlink from "../plugins/BiGraph/client/components/backlink.vue";
+import Backlink from "../plugins/BiGraph/client/components/Backlink.vue";
 import LocalGraph from "../plugins/BiGraph/client/components/LocalGraphView.vue";
 import GlobalGraph from "../plugins/BiGraph/client/components/GlobalGraphView.vue";
 import AuthorLink from "../plugins/Author/components/AuthorLink.vue";
