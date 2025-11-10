@@ -5,11 +5,14 @@ import { usePageData, usePageFrontmatter } from "vuepress/client";
 import { useRouter } from "vue-router";
 import type { MapNodeLink, Node, MapLink } from "../../types";
 import { getGraphData } from "../../utils/graph-data";
+import { GraphDataLoader } from "../../utils/graph-data-loader";
+import { LocalMapBuilder } from "../../builders/local-map-builder";
 
+let TAG = "useGraphData.ts"
 // 日志计数器
 let logCounter = 0;
 function log(step: string, data?: any) {
-  console.log(`${++logCounter}. [useGraphData] ${step}`, data ? data : '');
+  console.log(`[${TAG}] ${++logCounter}. [useGraphData] ${step}`, data ? data : '');
 }
 
 /**
@@ -24,9 +27,29 @@ export function useGraphData() {
   
   const mapData = ref<MapNodeLink>({ nodes: [], links: [] });
   const isLoading = ref(true);
-  const error = ref<string | null>(null);
+  const error = ref<Error | null>(null);
   const retryCount = ref(0);
   const maxRetries = 3;
+
+  const isLoaded = ref(false);
+  
+  const initialize = async (): Promise<boolean> => {
+    if (isLoaded.value) return true;
+    
+    isLoading.value = true;
+    error.value = null;
+    
+    try {
+      const success = await GraphDataLoader.initialize();
+      isLoaded.value = success;
+      return success;
+    } catch (err) {
+      error.value = err as Error;
+      return false;
+    } finally {
+      isLoading.value = false;
+    }
+  };
 
   /**
    * 加载图谱数据
@@ -41,7 +64,8 @@ export function useGraphData() {
     error.value = null;
     
     try {
-      const data = await getGraphData(page.value.path);
+      const data = LocalMapBuilder.generate(page.value.path)
+      // const data = await getGraphData(page.value.path);
       
       log("图谱数据加载成功", {
         节点数: data?.nodes?.length || 0,
@@ -55,7 +79,6 @@ export function useGraphData() {
         throw new Error("获取的数据格式不正确");
       }
     } catch (err) {
-      error.value = `加载关系数据失败: ${err}`;
       console.error("加载图谱数据失败:", err);
       
       // 重试逻辑
@@ -91,7 +114,6 @@ export function useGraphData() {
       }
     } catch (err) {
       console.error("节点点击处理失败:", err);
-      error.value = `导航失败: ${err}`;
     }
   };
 
@@ -122,6 +144,7 @@ export function useGraphData() {
 
   onMounted(() => {
     log("useGraphData onMounted 开始");
+    initialize();
     loadGraphData();
   });
 

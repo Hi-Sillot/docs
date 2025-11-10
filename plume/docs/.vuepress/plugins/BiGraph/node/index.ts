@@ -3,18 +3,17 @@
  * @author erduotong
  */
 // import { getDirname, path } from "vuepress/utils";
-import {
-    buildBioChainMap,
-    // writeGlobalGraph,
-    // writeTempGlobalGraph,
-} from "./buildMapData";
+// import {
+//     buildAndWriteMapData,
+// } from "./buildMapData";
 // import {buildBioChainMap, writeGlobalGraph, writeTempGlobalGraph} from "./buildMapData2";
 import type { App, Page, Plugin } from "vuepress/core";
 import { BiGraphConfig } from "../types";
 // import type { BiGraphConfig, Plugin } from "../types";
 import { ConfigManager } from "./config-manager";
 import { TempFileWriter } from "./temp-file-writer";
-import { VariableInjector } from "./variable-injector";
+import { injectGlobalVariables, VariableInjector } from "./variable-injector";
+import { BioChainService } from "../services/bio-chain-service";
 
 // const __dirname = getDirname(import.meta.url);
 export let options: BiGraphConfig = {};
@@ -54,6 +53,15 @@ const BiGraph = (config: BiGraphConfig = {}): Plugin => ({
         //     // export default ${JSON.stringify(writeGlobalGraph(app))};`
         // );
     },
+
+    // 在页面准备完成后构建双链数据
+    onPrepared: async (app: App) => {
+      const pages = app.pages;
+      await BioChainService.build(pages);
+      // 注入客户端全局变量
+      clientConfigFile: await injectGlobalVariables(app)
+    },
+    
   
     /**
      * 站点生成完成时的钩子
@@ -85,41 +93,3 @@ const BiGraph = (config: BiGraphConfig = {}): Plugin => ({
 
 export default BiGraph;
 
-// import type { BiGraphConfig, Plugin } from "../types";
-// import { ConfigManager } from "./config-manager";
-// import { TempFileWriter } from "./temp-file-writer";
-// import { VariableInjector } from "./variable-injector";
-
-// /**
-//  * 双链图谱插件
-//  */
-// const BiGraph = (config: BiGraphConfig = {}): Plugin => {
-//   const configManager = ConfigManager.getInstance();
-//   configManager.initialize(config);
-
-//   return {
-//     name: "vuepress-plugin-bi-graph",
-    
-//     /**
-//      * 应用初始化完成时的钩子
-//      */
-//     async onInitialized(app) {
-//       await TempFileWriter.writeBioTempFile(app);
-//     },
-
-//     /**
-//      * 站点生成完成时的钩子
-//      */
-//     async onGenerated(app) {
-//       // 可以在这里添加生成后的处理逻辑
-//     },
-
-//     /**
-//      * 定义客户端变量
-//      */
-//     define: VariableInjector.getInjectedVariables(),
-//   };
-// };
-
-// export default BiGraph;
-// export { BiGraphConfig } from "../types";

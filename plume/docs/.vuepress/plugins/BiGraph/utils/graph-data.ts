@@ -9,30 +9,52 @@ function log(step: string, data?: any) {
 }
 
 /**
- * 模拟获取图谱数据
- * 在实际应用中，这里应该从API、文件系统或其他数据源获取数据
+ * 检查是否在浏览器环境中运行
+ */
+function isBrowser(): boolean {
+  return typeof window !== 'undefined' && typeof document !== 'undefined';
+}
+
+/**
+ * 获取图谱数据
+ * 从全局的 bioChainMap 中获取实际的图谱数据
+ * 在 mounted 钩子中调用， `const graphData = await getGraphData(this.$route.path);`
  */
 export async function getGraphData(currentPath: string): Promise<MapNodeLink> {
   log("开始获取图谱数据", { 当前路径: currentPath });
   
+  // 如果不是浏览器环境，返回空数据（适用于构建时）
+  if (!isBrowser()) {
+    log("非浏览器环境，返回空数据");
+    return { nodes: [], links: [] };
+  }
+  
   return new Promise((resolve, reject) => {
     try {
-      // 模拟网络延迟
-      setTimeout(() => {
+      // 使用微任务延迟以确保全局变量已加载
+      Promise.resolve().then(() => {
         try {
-          // 这里应该是实际的数据获取逻辑
-          // 暂时使用模拟数据
-          const mockData = generateMockGraphData(currentPath);
+          // 从全局变量获取实际的图谱数据
+          // @ts-ignore
+          const globalBioChainMap = window.__BIO_CHAIN_MAP__;
+          
+          if (!globalBioChainMap) {
+            log("未找到全局双链映射表，返回空数据");
+            resolve({ nodes: [], links: [] });
+            return;
+          }
+
+          const graphData = generateGraphDataFromBioChainMap(currentPath, globalBioChainMap);
           log("图谱数据获取成功", { 
-            节点数: mockData.nodes.length, 
-            链接数: mockData.links.length 
+            节点数: graphData.nodes.length, 
+            链接数: graphData.links.length 
           });
-          resolve(mockData);
+          resolve(graphData);
         } catch (error) {
-          log("生成模拟数据时出错", error);
+          log("生成图谱数据时出错", error);
           reject(error);
         }
-      }, 500); // 模拟500ms网络延迟
+      });
     } catch (error) {
       log("获取图谱数据时出错", error);
       reject(error);
@@ -41,88 +63,97 @@ export async function getGraphData(currentPath: string): Promise<MapNodeLink> {
 }
 
 /**
- * 生成模拟图谱数据
- * 在实际应用中应该替换为真实的数据获取逻辑
+ * 从 bioChainMap 生成实际的图谱数据
  */
-function generateMockGraphData(currentPath: string): MapNodeLink {
-  log("生成模拟图谱数据", { 当前路径: currentPath });
+function generateGraphDataFromBioChainMap(currentPath: string, bioChainMap: any): MapNodeLink {
+  log("从双链映射表生成图谱数据", { 当前路径: currentPath });
   
   const nodes: Node[] = [];
   const links: MapLink[] = [];
-  
-  // 当前节点
-  const currentNode: Node = {
-    id: currentPath,
-    value: {
-      filePathRelative: currentPath,
-      title: getFileNameFromPath(currentPath),
-      htmlFilePathRelative: null,
-      permalink: null,
-      outlink: [],
-      backlink: []
-    },
-    x: 0,
-    y: 0,
-    isCurrent: true,
-    isIsolated: false,
-    linkCount: 0
-  };
-  nodes.push(currentNode);
-  
-  // 根据当前路径生成相关节点
-  const relatedFiles = generateRelatedFiles(currentPath);
-  
-  relatedFiles.forEach((file, index) => {
-    const node: Node = {
-      id: file.path,
+  const visited = new Set<string>();
+
+  // 使用 BFS 遍历相关节点
+  const queue: Array<{path: string, depth: number}> = [{ path: currentPath, depth: 0 }];
+  const maxDepth = 3; // 最大遍历深度
+
+  while (queue.length > 0) {
+    const { path, depth } = queue.shift()!;
+    
+    if (depth > maxDepth || visited.has(path)) {
+      continue;
+    }
+    
+    visited.add(path);
+    
+    const pageData = bioChainMap[path];
+    if (!pageData) {
+      log("未找到页面数据", { 路径: path });
+      continue;
+    }
+
+    // 创建当前节点
+    const currentNode: Node = {
+      id: path,
       value: {
-        filePathRelative: file.path,
-        title: file.name,
-        htmlFilePathRelative: null,
-        permalink: null,
-        outlink: [],
-        backlink: []
+        filePathRelative: pageData.filePathRelative,
+        title: pageData.title || getFileNameFromPath(path),
+        htmlFilePathRelative: pageData.htmlFilePathRelative,
+        permalink: pageData.permalink,
+        outlink: pageData.outlink || [],
+        backlink: pageData.backlink || []
       },
       x: 0,
       y: 0,
-      isCurrent: false,
+      isCurrent: path === currentPath,
       isIsolated: false,
       linkCount: 0
     };
-    nodes.push(node);
     
-    // 创建链接（随机连接）
-    if (Math.random() > 0.3) { // 70%的概率创建链接
-      const link: MapLink = {
-        source: currentNode.id,
-        target: node.id,
-      };
-      links.push(link);
+    // 避免重复添加节点
+    if (!nodes.find(node => node.id === path)) {
+      nodes.push(currentNode);
     }
-  });
-  
-  // 在相关节点之间创建一些链接
-  for (let i = 0; i < nodes.length; i++) {
-    for (let j = i + 1; j < nodes.length; j++) {
-      if (nodes[i].id !== currentNode.id && nodes[j].id !== currentNode.id && Math.random() > 0.7) {
-        const link: MapLink = {
-          source: nodes[i].id,
-          target: nodes[j].id,
-        };
-        links.push(link);
+
+    // 处理出链（当前页面指向的页面）
+    const outlinks = pageData.outlink || [];
+    outlinks.forEach((outlink: string) => {
+      // 添加链接
+      links.push({
+        source: path,
+        target: outlink,
+      });
+      
+      // 如果目标页面未被访问过，加入队列
+      if (!visited.has(outlink) && depth + 1 <= maxDepth) {
+        queue.push({ path: outlink, depth: depth + 1 });
       }
-    }
+    });
+
+    // 处理入链（指向当前页面的页面）
+    const backlinks = pageData.backlink || [];
+    backlinks.forEach((backlink: string) => {
+      // 添加入链关系
+      links.push({
+        source: backlink,
+        target: path,
+      });
+      
+      // 如果来源页面未被访问过，加入队列
+      if (!visited.has(backlink) && depth + 1 <= maxDepth) {
+        queue.push({ path: backlink, depth: depth + 1 });
+      }
+    });
   }
-  
-  // 更新连接数
+
+  // 更新节点的连接计数和孤立状态
   nodes.forEach(node => {
     node.linkCount = links.filter(link => 
       link.source === node.id || link.target === node.id
     ).length;
     node.isIsolated = node.linkCount === 0;
   });
-  
-  log("模拟数据生成完成", { 节点数: nodes.length, 链接数: links.length });
+
+  log("图谱数据生成完成", { 节点数: nodes.length, 链接数: links.length });
   
   return { nodes, links };
 }
@@ -138,106 +169,102 @@ function getFileNameFromPath(path: string): string {
 }
 
 /**
- * 生成相关文件列表
+ * 获取全局图谱数据（所有页面的完整图谱）
  */
-function generateRelatedFiles(currentPath: string): Array<{path: string, name: string}> {
-  const baseDir = currentPath.split('/').slice(0, -1).join('/');
-  const fileName = getFileNameFromPath(currentPath);
+export async function getGlobalGraphData(): Promise<MapNodeLink> {
+  log("开始获取全局图谱数据");
   
-  // 生成一些模拟的相关文件
-  const relatedFiles = [];
-  const fileCount = Math.floor(Math.random() * 8) + 3; // 3-10个相关文件
-  
-  for (let i = 0; i < fileCount; i++) {
-    const fileType = Math.random() > 0.5 ? '相关' : '参考';
-    relatedFiles.push({
-      path: `${baseDir}/${fileName}-${fileType}-${i + 1}.md`,
-      name: `${fileName} ${fileType} ${i + 1}`
-    });
+  // 如果不是浏览器环境，返回空数据
+  if (!isBrowser()) {
+    log("非浏览器环境，返回空数据");
+    return { nodes: [], links: [] };
   }
   
-  return relatedFiles;
+  return new Promise((resolve, reject) => {
+    try {
+      Promise.resolve().then(() => {
+        try {
+          // @ts-ignore
+          const globalBioChainMap = window.__BIO_CHAIN_MAP__;
+          
+          if (!globalBioChainMap) {
+            log("未找到全局双链映射表，返回空数据");
+            resolve({ nodes: [], links: [] });
+            return;
+          }
+
+          const graphData = generateGlobalGraphData(globalBioChainMap);
+          log("全局图谱数据获取成功", { 
+            节点数: graphData.nodes.length, 
+            链接数: graphData.links.length 
+          });
+          resolve(graphData);
+        } catch (error) {
+          log("生成全局图谱数据时出错", error);
+          reject(error);
+        }
+      });
+    } catch (error) {
+      log("获取全局图谱数据时出错", error);
+      reject(error);
+    }
+  });
 }
 
 /**
- * 从VuePress页面数据生成图谱数据
- * 这是更实际的实现方式
+ * 生成全局图谱数据（所有页面）
  */
-export async function getGraphDataFromVuePress(currentPath: string): Promise<MapNodeLink> {
-  log("从VuePress数据生成图谱数据", { 当前路径: currentPath });
+function generateGlobalGraphData(bioChainMap: any): MapNodeLink {
+  log("生成全局图谱数据");
   
-  try {
-    // 尝试从全局变量获取页面数据
-    // @ts-ignore
-    const pages = window.__VUEPRESS_PAGES__ || [];
+  const nodes: Node[] = [];
+  const links: MapLink[] = [];
+
+  // 遍历所有页面创建节点
+  Object.keys(bioChainMap).forEach(path => {
+    const pageData = bioChainMap[path];
     
-    if (pages.length === 0) {
-      log("未找到页面数据，使用模拟数据");
-      return getGraphData(currentPath);
-    }
+    const node: Node = {
+      id: path,
+      value: {
+        filePathRelative: pageData.filePathRelative,
+        title: pageData.title || getFileNameFromPath(path),
+        htmlFilePathRelative: pageData.htmlFilePathRelative,
+        permalink: pageData.permalink,
+        outlink: pageData.outlink || [],
+        backlink: pageData.backlink || []
+      },
+      x: 0,
+      y: 0,
+      isCurrent: false, // 全局图谱不标记当前节点
+      isIsolated: false,
+      linkCount: 0
+    };
     
-    const nodes: Node[] = [];
-    const links: MapLink[] = [];
-    
-    // 创建节点
-    pages.forEach((page: any) => {
-      const node: Node = {
-        id: page.path,
-        value: {
-          filePathRelative: page.path,
-          title: page.title  || getFileNameFromPath(page.path),
-          htmlFilePathRelative: null,
-          permalink: null,
-          outlink: [],
-          backlink: []
-        },
-        x: 0,
-        y: 0,
-        isCurrent: page.path === currentPath,
-        isIsolated: false,
-        linkCount: 0
-      };
-      nodes.push(node);
-    });
-    
-    // 创建链接（基于文件路径的相似性）
-    nodes.forEach((sourceNode, index) => {
-      nodes.forEach((targetNode, targetIndex) => {
-        if (index !== targetIndex) {
-          const sourceDir = sourceNode.id.split('/').slice(0, -1).join('/');
-          const targetDir = targetNode.id.split('/').slice(0, -1).join('/');
-          
-          // 相同目录下的文件有更高概率连接
-          if (sourceDir === targetDir && Math.random() > 0.5) {
-            links.push({
-              source: sourceNode.id,
-              target: targetNode.id,
-            });
-          }
-          // 当前文件与所有文件都有连接
-          else if (sourceNode.id === currentPath && Math.random() > 0.7) {
-            links.push({
-              source: sourceNode.id,
-              target: targetNode.id,
-            });
-          }
-        }
+    nodes.push(node);
+
+    // 创建出链链接
+    const outlinks = pageData.outlink || [];
+    outlinks.forEach((outlink: string) => {
+      links.push({
+        source: path,
+        target: outlink,
       });
     });
-    
-    // 更新连接数和孤立状态
-    nodes.forEach(node => {
-      node.linkCount = links.filter(link => 
-        link.source === node.id || link.target === node.id
-      ).length;
-      node.isIsolated = node.linkCount === 0;
-    });
-    
-    log("VuePress数据生成完成", { 节点数: nodes.length, 链接数: links.length });
-    
-    return { nodes, links };
-  } catch (error) {
-    log("从VuePress生成数据失败，使用模拟数据", error);
-    return getGraphData(currentPath);
-  }
+
+    // 创建入链链接（backlink 通常已经通过其他页面的 outlink 覆盖）
+    // 为避免重复，这里不单独处理 backlink
+  });
+
+  // 更新连接计数和孤立状态
+  nodes.forEach(node => {
+    node.linkCount = links.filter(link => 
+      link.source === node.id || link.target === node.id
+    ).length;
+    node.isIsolated = node.linkCount === 0;
+  });
+
+  log("全局图谱数据生成完成", { 节点数: nodes.length, 链接数: links.length });
+  
+  return { nodes, links };
 }

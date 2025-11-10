@@ -12,6 +12,7 @@ import type {
   QueueItem,
   TitleGetter,
 } from "../plugins/BiGraph/types/index";
+import { BioChainService } from "../plugins/BiGraph/services/bio-chain-service";
 let options: BiGraphConfig = {};
 
 export const useBioChainStore = defineStore("bioChain", {
@@ -42,40 +43,9 @@ export const useBioChainStore = defineStore("bioChain", {
      * @param titleGetter 标题获取函数（可选）
      */
     initializeBioChain(pages: Page[], titleGetter: TitleGetter = (page) => {
-      return page.title?.trim() || page.filePathRelative || "未命名";
+      return page.title?.trim() || page.permalink || "";
     }) {
-      // 步骤1：过滤无效页面并初始化基础映射
-      const validPages = pages.filter((page) =>
-        typeof page.filePathRelative === "string"
-      );
-      validPages.forEach((page) => {
-        const filePath = page.filePathRelative!;
-        this.bioChainMap[filePath] = {
-          title: titleGetter(page),
-          filePathRelative: filePath,
-          htmlFilePathRelative: page.htmlFilePathRelative,
-          permalink: page.permalink,
-          outlink: [],
-          backlink: [],
-        };
-      });
-
-      // 步骤2：构建双向链接关系
-      validPages.forEach((page) => {
-        const links = page.links.map((link) =>
-          decodeURIComponent(link.relative)
-        );
-
-        links.forEach((link) => {
-          if (this.bioChainMap[link]) {
-            // 更新反向链接（被引用页面的 backlink）
-            this.bioChainMap[link].backlink.push(page.filePathRelative);
-            // 更新正向链接（当前页面的 outlink）
-            if (page.filePathRelative)
-            this.bioChainMap[page.filePathRelative].outlink.push(link);
-          }
-        });
-      });
+      BioChainService.build(pages)
     },
 
     /**
@@ -89,19 +59,19 @@ export const useBioChainStore = defineStore("bioChain", {
       maxDeep = options.localGraphDeep || 5,
     ): MapNodeLink {
       const localMap: Record<string, LocalMapItem> = {};
-      const queue: QueueItem[] = [{ path: root, depth: 0 }];
+      const queue: QueueItem[] = [{ permalink: root, depth: 0 }];
       const visited = new Set<string>();
 
       while (queue.length > 0) {
-        const { path, depth } = queue.shift()!;
-        if (depth > maxDeep || visited.has(path)) continue;
+        const { permalink, depth } = queue.shift()!;
+        if (depth > maxDeep || visited.has(permalink)) continue;
 
-        visited.add(path);
-        const currentItem = this.getBioChainItem(path)!;
+        visited.add(permalink);
+        const currentItem = this.getBioChainItem(permalink)!;
 
-        localMap[path] = {
+        localMap[ppermalinkath] = {
           title: currentItem.title,
-          path: path,
+          filePathRelative: permalink,
           htmlFilePathRelative: currentItem.htmlFilePathRelative,
           permalink: currentItem.permalink,
           outlink: [],
@@ -111,16 +81,16 @@ export const useBioChainStore = defineStore("bioChain", {
         // 处理正向链接
         currentItem.outlink.forEach((link) => {
           if (!visited.has(link) && depth + 1 <= maxDeep) {
-            queue.push({ path: link, depth: depth + 1 });
-            localMap[path].outlink.push(link);
+            queue.push({ permalink: link, depth: depth + 1 });
+            localMap[permalink].outlink.push(link);
           }
         });
 
         // 处理反向链接
         currentItem.backlink.forEach((link) => {
           if (!visited.has(link) && depth + 1 <= maxDeep) {
-            queue.push({ path: link, depth: depth + 1 });
-            localMap[path].backlink.push(link);
+            queue.push({ permalink: link, depth: depth + 1 });
+            localMap[permalink].backlink.push(link);
           }
         });
       }
@@ -179,85 +149,6 @@ export const useBioChainStore = defineStore("bioChain", {
 
       return globalMap;
     },
-
-    /**
-     * 格式化链接并写入页面数据（整合原 write_to_frontmatter 核心逻辑）
-     * @param page 目标页面
-     */
-    // formatAndStorePageData(page: Page) {
-    //   const filePath = page.filePathRelative;
-    //   if (!filePath || !this.bioChainMap[filePath]) return;
-
-    //   const chainItem = this.bioChainMap[filePath];
-
-    //   // 链接去重
-    //   chainItem.outlink = [...new Set(chainItem.outlink)];
-    //   chainItem.backlink = [...new Set(chainItem.backlink)];
-
-    //   // 格式化正向链接（.md -> .html）
-    //   const formattedOutlinks = chainItem.outlink.map((link) => {
-    //     const parsed = path.parse(link);
-    //     const htmlLink = parsed.ext === ".md"
-    //       ? path.format({ ...parsed, ext: ".html" })
-    //       : link;
-    //     return {
-    //       title: this.bioChainMap[link]?.title || "未命名",
-    //       link: htmlLink,
-    //     };
-    //   });
-
-    //   // 格式化反向链接（.md -> .html）
-    //   const formattedBacklinks = chainItem.backlink.map((link) => {
-    //     const parsed = path.parse(link);
-    //     const htmlLink = parsed.ext === ".md"
-    //       ? path.format({ ...parsed, ext: ".html" })
-    //       : link;
-    //     return {
-    //       title: this.bioChainMap[link]?.title || "未命名",
-    //       link: htmlLink,
-    //     };
-    //   });
-
-    //   // 生成并存储页面数据
-    //   this.pageData[filePath] = {
-    //     outlink: formattedOutlinks,
-    //     backlink: formattedBacklinks,
-    //     localMap: this.generateLocalMap(filePath),
-    //   };
-    // },
   },
 });
 export default useBioChainStore;
-
-// ------------------------------
-// 以下为文件操作辅助函数（独立于Store）
-// ------------------------------
-
-// /**
-//  * 写入全局图谱文件
-//  * @param app VuePress应用实例
-//  */
-// export async function writeGlobalGraph(app: App): Promise<void> {
-//   const store = useBioChainStore();
-//   const globalMap = store.getGlobalMap();
-//   const location = app.dir.dest(graphDataName);
-
-//   await fs.ensureDir(path.dirname(location));
-//   await fs.writeFile(location, JSON.stringify(globalMap), "utf-8");
-// }
-
-// /**
-//  * 写入临时全局图谱文件
-//  * @param app VuePress应用实例
-//  * @returns 临时文件相对路径
-//  */
-// export function writeTempGlobalGraph(app: App): string {
-//   const store = useBioChainStore();
-//   const globalMap = store.getGlobalMap();
-//   const location = app.dir.temp(graphDataName);
-
-//   fs.ensureDirSync(path.dirname(location));
-//   fs.writeFileSync(location, JSON.stringify(globalMap), "utf-8");
-
-//   return path.relative(app.dir.source(), location);
-// }

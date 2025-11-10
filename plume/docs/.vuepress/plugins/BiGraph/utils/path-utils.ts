@@ -18,13 +18,6 @@ export class PathUtils {
   }
 
   /**
-   * 解码URI组件并处理路径
-   */
-  public static decodeAndNormalizePath(relativePath: string): string {
-    return decodeURIComponent(relativePath);
-  }
-
-  /**
    * 数组去重
    */
   public static uniqueArray<T>(array: T[]): T[] {

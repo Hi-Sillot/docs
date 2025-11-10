@@ -1,9 +1,8 @@
 ---
 title: foo
 createTime: 2025/11/09 13:11:21
-permalink: /demo/akr4jj25/
+permalink: /demo/foo/
 ---
-
 [bar](./bar.md)
 
 <BannerTopArchived/>
@@ -12,9 +11,7 @@ permalink: /demo/akr4jj25/
 
 <BannerTopPrNeed/>
 
-打开 <VSCodeSettingsLink id="workbench.localHistory.enabled" /> 试试
-
-
+打开 `<VSCodeSettingsLink id="workbench.localHistory.enabled" />` 试试
 
 <!-- @include: ./foo.snippet.md#VedioTabs -->
 
@@ -37,6 +34,7 @@ permalink: /demo/akr4jj25/
 6
 
 6
+
 <!-- 
 <VideoTabs 
   ap="https://artplayer.org/assets/sample/video.mp4" 
@@ -44,7 +42,6 @@ permalink: /demo/akr4jj25/
   bb="BV1ZMNQziEGd" 
   active="bb" 
 /> -->
-
 
 <!-- @include: ./foo.snippet.md -->
 

@@ -2,12 +2,18 @@ import type * as vp from 'vuepress';
 import type { App, Plugin } from "vuepress/core";
 export type { App, Plugin };
 
-
-// export declare const __RELATIONAL_GRAPH_FOLD_EMPTY_GRAPH: boolean;
-// export declare const __RELATIONAL_GRAPH_LOCAL_GRAPH_DEEP: number;
-// export declare const __RELATIONAL_GRAPH_HEIGHT: number;
-// export declare const __RELATIONAL_GRAPH_MAX_WIDTH: number;
-// export declare const __RELATIONAL_GRAPH_ENABLE_GLOBAL_GRAPH: boolean;
+/**
+ * {
+    raw: './foo.md',
+    absolute: '/demo/foo.md',
+    relative: 'demo/foo.md'
+  }
+ */
+export interface PageLinks {
+  raw: string,
+  absolute: string,
+  relative: string,
+}
 
 export interface BioChainData {
     outlink: LinkItem[];
@@ -15,15 +21,11 @@ export interface BioChainData {
     localMap: MapNodeLink;
 }
 
-// export interface MapNodeLink {
-//     nodes: Node[];
-//     links: Link[];
-// }
 /**
  * 节点-链接格式的图谱数据
  */
 export interface MapNodeLink {
-  nodes: MapNode[];
+  nodes: Node[];  // 这里应该是 Node[] 而不是 MapNode[]
   links: MapLink[];
 }
 
@@ -36,7 +38,6 @@ export interface MapLink {
     isVirtual?: boolean;
 }
 
-
 /**
  * 图谱节点
  */
@@ -48,6 +49,7 @@ export interface MapNode {
   };
   linkCount: number;
 }
+
 export interface Node {
   id: string;
   value: {
@@ -72,17 +74,12 @@ export interface LinkItem {
     link: string;
 }
 
-
-
-
 export interface NodeValue {
     title: string;
     filePathRelative: string | null;
     outlink?: string[];
     backlink?: string[];
 }
-
-
 
 /**
  * 本地映射项
@@ -112,7 +109,7 @@ export interface BioChainMapItem {
  * 队列项（用于BFS遍历）
  */
 export interface QueueItem {
-    path: string;
+    permalink: string;
     depth: number;
 }
 
@@ -127,6 +124,7 @@ export interface MousePosition {
 }
 
 export type Page = vp.Page;
+
 /**
  * 标题获取器类型
  */
@@ -136,7 +134,7 @@ export interface BiGraphConfig {
     localGraphDeep?: number; // 局部关系图谱的深度（以当前页面为中心） 默认为5
     foldEmptyGraph?: boolean; // 是否折叠空的关系图谱（只有一个节点） 默认为false
     graphMaxWidth?: number; // 最大宽度 单位: px 默认为 Infinity
-    graphHeight?: number; // 度 单位: px  默认为 300
+    graphHeight?: number; // 高度 单位: px  默认为 300
     enableGlobalGraph?: boolean; // 是否启用全局关系图谱 默认为true
     enableLocalGraph?: boolean; // 是否启用局部关系图谱 默认为true
     titleGetter?: TitleGetter; // 标题获取器 需要返回页面的标题 默认为 page的title，如果不存在就用path
