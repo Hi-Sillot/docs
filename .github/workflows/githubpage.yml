@@ -22,8 +22,8 @@ jobs:
         with:
           # 选择要使用的 pnpm 版本
           version: 10
-          # 使用 pnpm 安装依赖
-          run_install: true
+          # 移除自动安装，我们稍后手动安装
+          run_install: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -32,10 +32,17 @@ jobs:
           node-version: 22
           # 缓存 pnpm 依赖
           cache: pnpm
+          cache-dependency-path: plume/pnpm-lock.yaml
+
+       # 安装依赖（在 plume 目录中）
+      - name: Install dependencies
+        run: pnpm install
+        working-directory: plume
 
       # 运行构建脚本
       - name: Build VuePress site
-        run: cd plume && pnpm docs:build
+        run: pnpm docs:build
+        working-directory: plume
 
       # 查看 workflow 的文档来获取更多信息
       # @see https://github.com/crazy-max/ghaction-github-pages
