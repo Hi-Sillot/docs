@@ -12,7 +12,7 @@
 import { viteBundler } from '@vuepress/bundler-vite'
 import { defineUserConfig } from 'vuepress'
 import { plumeTheme } from 'vuepress-theme-plume'
-
+import { llmsPlugin } from '@vuepress/plugin-llms' // 为你的站点添加 llms.txt，以提供对 LLM 友好的内容。https://ecosystem.vuejs.press/zh/plugins/ai/llms.html
 import { revealJsPlugin } from '@vuepress/plugin-revealjs' // 在你的 VuePress 中添加幻灯片
 import BiGraph from "./plugins/BiGraph/node/index";
 import AuthorPlugin from './plugins/Author/authorData'
@@ -46,6 +46,9 @@ export default defineUserConfig({
   shouldPrefetch: false, // 站点较大，页面数量较多时，不建议启用
 
   plugins: [
+    llmsPlugin({
+      // 配置项
+    }),
     AuthorPlugin(),
     BiGraph({
       localGraphDeep: 20,
@@ -57,6 +60,9 @@ export default defineUserConfig({
       // 插件选项
     }),
   ],
+
+  // 现在任何带有 `.snippet.md` 扩展名的文件都不会呈现为页面
+  pagePatterns: ['**/*.md', '!**/*.snippet.md', '!.vuepress', '!node_modules'],
 
   theme: plumeTheme({
     /* 添加您的部署域名, 有助于 SEO, 生成 sitemap */
@@ -124,12 +130,14 @@ export default defineUserConfig({
      * @see https://theme-plume.vuejs.press/config/markdown/
      */
     markdown: {
+      include: {},        // 启用引入其他 markdown 文件内容
       abbr: true,         // 启用 abbr 语法  *[label]: content
       annotation: true,   // 启用 annotation 语法  [+label]: content
       pdf: true,          // 启用 PDF 嵌入 @[pdf](/xxx.pdf)
       caniuse: true,      // 启用 caniuse 语法  @[caniuse](feature_name)
       plot: true,         // 启用隐秘文本语法 !!xxxx!!
       bilibili: true,     // 启用嵌入 bilibili视频 语法 @[bilibili](bid)
+      acfun: true,        // 启用嵌入 acfun视频 语法 @[acfun](aid)
       youtube: true,      // 启用嵌入 youtube视频 语法 @[youtube](video_id)
       artPlayer: true,    // 启用嵌入 artPlayer 本地视频 语法 @[artPlayer](url)
       audioReader: true,  // 启用嵌入音频朗读功能 语法 @[audioReader](url)

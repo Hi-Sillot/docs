@@ -17,6 +17,7 @@
     "@vuepress/bundler-vite": "2.0.0-rc.26",
     "@vuepress/plugin-comment": "2.0.0-rc.118",
     "@vuepress/plugin-links-check": "2.0.0-rc.118",
+    "@vuepress/plugin-llms": "2.0.0-rc.118",
     "@vuepress/plugin-revealjs": "2.0.0-rc.118",
     "http-server": "^14.1.1",
     "pinia": "^3.0.3",
