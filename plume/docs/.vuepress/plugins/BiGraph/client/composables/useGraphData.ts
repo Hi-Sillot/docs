@@ -19,7 +19,7 @@ export function useGraphData() {
   const frontmatter = usePageFrontmatter();
   
   const mapData = ref<MapNodeLink>({ nodes: [], links: [] });
-  const isLoading = ref(true);
+  const isLoading = ref(false);
   const error = ref<string | null>(null);
   const retryCount = ref(0);
   const maxRetries = 3;

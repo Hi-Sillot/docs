@@ -19,8 +19,12 @@ function log(step: string, data?: any) {
 
 // 定义 emit 事件
 const emit = defineEmits<{
-  (e: "nodeClick", path: string): void;
+  (e: "nodeClick", node: Node): void; // 修改：传递整个节点对象
+  (e: "nodeHover", node: Node | null): void; // 添加悬停事件
 }>();
+// const emit = defineEmits<{
+//   (e: "nodeClick", path: string): void;
+// }>();
 
 const props = defineProps<{
   data: MapNodeLink | null;  // 修改：允许为 null
@@ -32,6 +36,202 @@ const props = defineProps<{
 const effectiveData = computed(() => {
   return props.data || { nodes: [], links: [] };
 });
+
+// 工具提示相关响应式数据
+const tooltipVisible = ref(false);
+const tooltipPosition = ref({ x: 0, y: 0 });
+const tooltipContent = ref<Node | null>(null);
+const tooltipTimeout = ref<NodeJS.Timeout | null>(null);
+
+// 工具提示方法
+const showTooltip = (node: Node, x: number, y: number) => {
+  if (tooltipTimeout.value) {
+    clearTimeout(tooltipTimeout.value);
+    tooltipTimeout.value = null;
+  }
+  
+  tooltipContent.value = node;
+  tooltipPosition.value = { x, y };
+  tooltipVisible.value = true;
+};
+
+const hideTooltip = () => {
+  tooltipVisible.value = false;
+  tooltipContent.value = null;
+  
+  if (tooltipTimeout.value) {
+    clearTimeout(tooltipTimeout.value);
+    tooltipTimeout.value = null;
+  }
+};
+
+const delayedHideTooltip = () => {
+  tooltipTimeout.value = setTimeout(() => {
+    hideTooltip();
+  }, 300);
+};
+
+const handleNodeClick = (node: Node) => {
+  log("节点点击", { node: node.id, path: node.id });
+  emit("nodeClick", node); // 传递整个节点对象
+  // emit("nodeClick", node.id);
+  hideTooltip();
+};
+
+// 在 RelationGraphCanvas.vue 中添加新的工具类
+class TooltipEventHandlers {
+  private canvas: HTMLCanvasElement;
+  private simulation: d3.Simulation<Node, MapLink>;
+  private transform: d3.ZoomTransform;
+  private nodes: Node[];
+  private links: MapLink[];
+  private canvasSize: CanvasSize;
+  
+  // 回调函数
+  private showTooltipFn: (node: Node, x: number, y: number) => void;
+  private hideTooltipFn: () => void;
+  private delayedHideTooltipFn: () => void;
+  private handleNodeClickFn: (node: Node) => void;
+
+  constructor(
+    canvas: HTMLCanvasElement,
+    simulation: d3.Simulation<Node, MapLink>,
+    transform: d3.ZoomTransform,
+    nodes: Node[],
+    links: MapLink[],
+    canvasSize: CanvasSize,
+    showTooltipFn: (node: Node, x: number, y: number) => void,
+    hideTooltipFn: () => void,
+    delayedHideTooltipFn: () => void,
+    handleNodeClickFn: (node: Node) => void
+  ) {
+    this.canvas = canvas;
+    this.simulation = simulation;
+    this.transform = transform;
+    this.nodes = nodes;
+    this.links = links;
+    this.canvasSize = canvasSize;
+    this.showTooltipFn = showTooltipFn;
+    this.hideTooltipFn = hideTooltipFn;
+    this.delayedHideTooltipFn = delayedHideTooltipFn;
+    this.handleNodeClickFn = handleNodeClickFn;
+
+    // 绑定事件处理函数
+    this.onMouseMove = this.onMouseMove.bind(this);
+  }
+
+  onClick(event: MouseEvent): void {
+    const rect = this.canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+
+    // 转换坐标到画布空间
+    const transformedX = (x - this.transform.x) / this.transform.k;
+    const transformedY = (y - this.transform.y) / this.transform.k;
+
+    // 查找点击的节点
+    const clickedNode = this.findNodeAt(transformedX, transformedY);
+    
+    if (clickedNode) {
+      this.handleNodeClickFn(clickedNode);
+      event.preventDefault();
+      return; // 如果点击了节点，不执行其他逻辑
+    }
+  }
+
+  // 鼠标移动事件处理，用于显示提示
+  onMouseMove(event: MouseEvent): void {
+    const rect = this.canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+
+    // 转换坐标到画布空间
+    const transformedX = (x - this.transform.x) / this.transform.k;
+    const transformedY = (y - this.transform.y) / this.transform.k;
+
+    // 查找鼠标下的节点
+    const hoveredNode = this.findNodeAt(transformedX, transformedY);
+    
+    if (hoveredNode) {
+      this.showTooltipFn(hoveredNode, event.clientX, event.clientY);
+    } else {
+      this.delayedHideTooltipFn();
+    }
+  }
+
+  // 查找指定位置的节点
+  private findNodeAt(x: number, y: number, radius: number = 8): Node | null {
+    for (const node of this.nodes) {
+      if (node.x && node.y)
+      {
+        const distance = Math.sqrt(Math.pow(node.x - x, 2) + Math.pow(node.y - y, 2));
+        if (distance <= radius) {
+          return node;
+        }
+      }
+    }
+    return null;
+  }
+
+  // 缩放事件过滤器
+  filterZoomEvent(event: d3.D3ZoomEvent<HTMLCanvasElement, unknown>): boolean {
+    return true;
+  }
+
+}
+// 事件处理
+let eventHandlers: TooltipEventHandlers | null = null;
+
+function setupEventListeners(): void {
+  log("setupEventListeners 开始", { 
+    hasCanvas: !!canvasRef.value, 
+    hasSimulation: !!simulation.value 
+  });
+
+  if (!canvasRef.value || !simulation.value) return;
+
+  // 创建缩放行为
+  const zoom = d3
+    .zoom<HTMLCanvasElement, unknown>()
+    .scaleExtent(CANVAS_CONFIG.zoomExtent)
+    .touchable(true)
+    .on("zoom", (event: d3.D3ZoomEvent<HTMLCanvasElement, unknown>) => {
+      transform.value = event.transform;
+      if (drawingManager) {
+        drawingManager.setTransform(transform.value);
+      }
+      ticked();
+    });
+
+  // 设置缩放过滤器
+  zoom.filter((event: any) => {
+    if (eventHandlers) {
+      return eventHandlers.filterZoomEvent(event);
+    }
+    return true;
+  });
+
+  d3.select(canvasRef.value).call(zoom);
+
+  // 创建工具提示事件处理器
+  eventHandlers = new TooltipEventHandlers(
+    canvasRef.value,
+    simulation.value,
+    transform.value,
+    map_data.value.nodes,
+    map_data.value.links,
+    canvasSize.value,
+    showTooltip,
+    hideTooltip,
+    delayedHideTooltip,
+    handleNodeClick
+  );
+
+  // 添加事件监听
+  canvasRef.value.addEventListener("click", (e) => eventHandlers!.onClick(e));
+  canvasRef.value.addEventListener("mousemove", (e) => eventHandlers!.onMouseMove(e));
+  log("事件监听设置完成");
+}
 
 log("组件初始化开始", { 
   propsData: props.data, 
@@ -298,47 +498,8 @@ function ticked(): void {
   drawingManager.restoreTransform();
 }
 
-// 事件处理
-let eventHandlers: EventHandlers | null = null;
 
-function setupEventListeners(): void {
-  log("setupEventListeners 开始", { 
-    hasCanvas: !!canvasRef.value, 
-    hasSimulation: !!simulation.value 
-  });
 
-  if (!canvasRef.value || !simulation.value) return;
-
-  const zoom = d3
-    .zoom<HTMLCanvasElement, unknown>()
-    .scaleExtent(CANVAS_CONFIG.zoomExtent)
-    .filter((event: d3.D3ZoomEvent<HTMLCanvasElement, unknown>) => 
-      eventHandlers?.filterZoomEvent(event) ?? true
-    )
-    .touchable(true)
-    .on("zoom", (event: d3.D3ZoomEvent<HTMLCanvasElement, unknown>) => {
-      transform.value = event.transform;
-      if (drawingManager) {
-        drawingManager.setTransform(transform.value);
-      }
-      ticked();
-    });
-
-  d3.select(canvasRef.value).call(zoom);
-
-  eventHandlers = new EventHandlers(
-    canvasRef.value,
-    simulation.value,
-    transform.value,
-    map_data.value.nodes,
-    map_data.value.links,
-    canvasSize.value
-  );
-
-  canvasRef.value.addEventListener("mousedown", (e) => eventHandlers?.onMouseDown(e));
-  
-  log("事件监听设置完成");
-}
 
 // 生命周期
 onMounted(() => {
@@ -450,16 +611,48 @@ watch([() => effectiveData.value, () => props.currentPath], ([newData, newPath],
 </script>
 
 <template>
-  <canvas
-    ref="canvasRef"
-    :width="canvasSize.width"
-    :height="canvasSize.height"
-    :style="{
-      width: canvasSize.width + 'px',
-      height: canvasSize.height + 'px',
-    }"
-    @click="log('canvas 点击事件')"
-  ></canvas>
+  <div class="relation-graph-container">
+    <canvas
+      ref="canvasRef"
+      :width="canvasSize.width"
+      :height="canvasSize.height"
+      :style="{
+        width: canvasSize.width + 'px',
+        height: canvasSize.height + 'px',
+      }"
+    ></canvas>
+    
+ <!-- 节点工具提示（仅信息展示，不包含点击功能） -->
+    <div
+      v-if="tooltipVisible && tooltipContent"
+      class="node-tooltip"
+      :style="{
+        left: tooltipPosition.x + 10 + 'px',
+        top: tooltipPosition.y + 10 + 'px',
+      }"
+      @mouseenter="hideTooltip"
+    >
+      <div class="tooltip-header">
+        <h4 class="tooltip-title">{{ tooltipContent.value.title || tooltipContent.id }}</h4>
+        <span class="tooltip-badge" :class="{
+          'current': tooltipContent.isCurrent,
+          'isolated': tooltipContent.isIsolated
+        }">
+          {{ tooltipContent.isCurrent ? '当前' : tooltipContent.isIsolated ? '孤立' : '节点' }}
+        </span>
+      </div>
+      
+      <div class="tooltip-content">
+        <p class="tooltip-path">{{ tooltipContent.id }}</p>
+        <p v-if="tooltipContent.linkCount !== undefined" class="tooltip-stats">
+          连接数: {{ tooltipContent.linkCount }}
+        </p>
+        <p class="tooltip-hint">单击节点查看详情</p>
+      </div>
+      
+      <div class="tooltip-arrow"></div>
+    </div>
+  </div>
 </template>
 
 <style scoped>
@@ -471,4 +664,127 @@ canvas {
   top: 0;
   left: 0;
 }
+
+.node-tooltip {
+  position: fixed;
+  z-index: 1000;
+  background: var(--vp-c-bg);
+  border: 1px solid var(--vp-c-border);
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(10px);
+  min-width: 200px;
+  max-width: 300px;
+  animation: tooltipFadeIn 0.2s ease-out;
+  cursor: default; /* 默认光标，不可点击 */
+  transition: all 0.2s ease;
+}
+
+.node-tooltip:hover {
+  box-shadow: 0 6px 25px rgba(0, 0, 0, 0.2);
+  transform: translateY(-1px);
+}
+
+@keyframes tooltipFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.tooltip-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+  gap: 8px;
+}
+
+.tooltip-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--vp-c-text-1);
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.tooltip-badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.tooltip-badge.current {
+  background: var(--vp-c-green-soft);
+  color: var(--vp-c-green);
+}
+
+.tooltip-badge.isolated {
+  background: var(--vp-c-yellow-soft);
+  color: var(--vp-c-yellow);
+}
+
+.tooltip-badge:not(.current):not(.isolated) {
+  background: var(--vp-c-gray-soft);
+  color: var(--vp-c-text-2);
+}
+
+.tooltip-content {
+  margin-bottom: 8px;
+}
+
+.tooltip-path {
+  margin: 0 0 6px 0;
+  font-size: 11px;
+  color: var(--vp-c-text-2);
+  word-break: break-all;
+  line-height: 1.2;
+}
+
+.tooltip-stats {
+  margin: 0 0 6px 0;
+  font-size: 12px;
+  color: var(--vp-c-text-3);
+}
+
+.tooltip-hint {
+  margin: 0;
+  font-size: 11px;
+  color: var(--vp-c-brand);
+  font-style: italic;
+}
+
+.tooltip-arrow {
+  position: absolute;
+  top: -5px;
+  left: 20px;
+  width: 10px;
+  height: 10px;
+  background: var(--vp-c-bg);
+  border-left: 1px solid var(--vp-c-border);
+  border-top: 1px solid var(--vp-c-border);
+  transform: rotate(45deg);
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .node-tooltip {
+    max-width: 250px;
+    padding: 10px;
+  }
+  
+  .tooltip-title {
+    font-size: 13px;
+  }
+}
+
 </style>

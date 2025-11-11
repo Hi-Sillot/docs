@@ -1,11 +1,11 @@
 <!-- components/GlobalGraphView.vue -->
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, onUnmounted, watch } from "vue";
+import type { CanvasSize, MapLink, MapNodeLink, Node } from "../../types";
 import { useRouter } from "vuepress/client";
 import RelationGraph from "./RelationGraphCanvas.vue";
 import { debug } from "../../utils/debug";
 import { useBioChainStore } from "../../stores/bioChain";
-// import { useBioChainStore } from "../../stores/bio-chain-store";
 
 
 const TAG = "GlobalGraphView";
@@ -51,27 +51,64 @@ debug.log(TAG, "计算属性初始化完成", {
   isGraphLoading: isGraphLoading.value
 });
 
-// 方法
+// 节点模态窗口相关状态
+const nodeModalVisible = ref(false);
+const selectedNode = ref<Node | null>(null);
+const iframeLoading = ref(false);
+
 /**
- * 处理节点点击
+ * 处理节点点击 - 打开模态窗口
  */
-const handleNodeClick = (path: string): void => {
-  debug.log(TAG, "处理节点点击", { 
-    点击路径: path,
-    当前路径: router.currentRoute.value.path
+const handleNodeClickModal = (node: Node): void => {
+  debug.log(TAG, "打开节点模态窗口", { 
+    节点ID: node.id,
+    节点标题: node.value.title
   });
   
   try {
-    if (path && path !== router.currentRoute.value.path) {
-      router.push(path);
-      // 点击后关闭全局图谱
-      handleClose();
-      debug.log(TAG, "路由跳转完成，已关闭全局图谱");
-    }
+    selectedNode.value = node;
+    nodeModalVisible.value = true;
+    iframeLoading.value = true;
+    debug.log(TAG, "节点模态窗口已打开");
   } catch (error) {
-    debug.error(TAG, "节点点击处理失败", error);
+    debug.error(TAG, "打开节点模态窗口失败", error);
   }
 };
+
+/**
+ * 关闭节点模态窗口
+ */
+const closeNodeModal = (): void => {
+  debug.log(TAG, "关闭节点模态窗口");
+  nodeModalVisible.value = false;
+  selectedNode.value = null;
+  iframeLoading.value = false;
+};
+
+/**
+ * 在模态窗口中打开页面（路由跳转）
+ */
+const openNodeInPage = (): void => {
+  if (selectedNode.value) {
+    debug.log(TAG, "在页面中打开节点", { 
+      节点ID: selectedNode.value.id,
+      当前路径: router.currentRoute.value.path
+    });
+    
+    try {
+      if (selectedNode.value.id && selectedNode.value.id !== router.currentRoute.value.path) {
+        router.push(selectedNode.value.id);
+        closeNodeModal();
+        // 同时关闭全局图谱
+        handleClose();
+        debug.log(TAG, "页面跳转完成，已关闭模态窗口和全局图谱");
+      }
+    } catch (error) {
+      debug.error(TAG, "页面跳转失败", error);
+    }
+  }
+};
+
 
 /**
  * 关闭全局图谱 - 修复：使用正确的方法
@@ -79,7 +116,8 @@ const handleNodeClick = (path: string): void => {
 const handleClose = (): void => {
   debug.log(TAG, "手动关闭全局图谱");
   bioStore.hideGlobalGraphModal();
-  debug.log(TAG, "关闭后状态", { showGlobalGraph: bioStore.showGlobalGraph });
+  // 同时关闭节点模态窗口
+  closeNodeModal();
 };
 
 /**
@@ -188,7 +226,7 @@ onMounted(() => {
   debug.log(TAG, "组件挂载", bioStore.globalGraphData);
   
   // 重要修复：确保组件挂载时不会自动显示
-  if (bioStore.showGlobalGraph) {
+  if (showGlobalGraph.value === true) {
     debug.warn(TAG, "组件挂载时发现全局图谱已显示，正在重置状态");
     bioStore.hideGlobalGraphModal();
   }
@@ -214,6 +252,8 @@ onUnmounted(() => {
     resizeObserver.disconnect();
     debug.log(TAG, "ResizeObserver 已断开");
   }
+  // 清理节点模态窗口状态
+  closeNodeModal();
 });
 
 debug.log(TAG, "组件初始化完成");
@@ -281,7 +321,7 @@ debug.log(TAG, "组件初始化完成");
           </div>
         </div>
 
-        <!-- 关系图谱组件 -->
+        <!-- 关系图谱组件 - 修改：使用节点模态窗口 -->
         <RelationGraph
           ref="graphRef"
           :key="'global-graph-' + canvasSize.width + '-' + canvasSize.height"
@@ -289,8 +329,83 @@ debug.log(TAG, "组件初始化完成");
           :canvas-width="canvasSize.width"
           :current-path="router.currentRoute.value.path"
           :data="graphData"
-          @node-click="handleNodeClick"
+          @node-click="handleNodeClickModal"
         />
+      </div>
+    </div>
+  </div>
+
+  <!-- 节点详情模态窗口 -->
+  <div
+    v-if="nodeModalVisible && showGlobalGraph"
+    class="global-node-modal"
+    @click.self="closeNodeModal"
+  >
+    <div class="global-node-modal__content">
+      <!-- 模态窗口头部 -->
+      <div class="global-node-modal__header">
+        <h3 class="global-node-modal__title">
+          {{ selectedNode?.value.title || selectedNode?.id }}
+        </h3>
+        <div class="global-node-modal__actions">
+          <button
+            v-if="selectedNode"
+            @click="openNodeInPage"
+            class="global-node-modal__action-btn"
+            title="在新页面中打开"
+          >
+            📄 当前页面跳转
+          </button>
+          <button
+            @click="closeNodeModal"
+            class="global-node-modal__close-btn"
+            title="关闭"
+          >
+            ✕
+          </button>
+        </div>
+      </div>
+
+      <!-- 节点信息 -->
+      <div class="global-node-modal__info">
+        <div class="global-node-info__item">
+          <span class="global-node-info__label">路径:</span>
+          <span class="global-node-info__value">{{ selectedNode?.id }}</span>
+        </div>
+        <div v-if="selectedNode?.linkCount !== undefined" class="global-node-info__item">
+          <span class="global-node-info__label">连接数:</span>
+          <span class="global-node-info__value">{{ selectedNode.linkCount }}</span>
+        </div>
+        <div class="global-node-info__item">
+          <span class="global-node-info__label">状态:</span>
+          <span
+            class="global-node-info__badge"
+            :class="{
+              'current': selectedNode?.isCurrent,
+              'isolated': selectedNode?.isIsolated
+            }"
+          >
+            {{ selectedNode?.isCurrent ? '当前页面' : selectedNode?.isIsolated ? '孤立节点' : '普通节点' }}
+          </span>
+        </div>
+      </div>
+
+      <!-- iframe 内容 -->
+      <div class="global-node-modal__iframe-container">
+        <div v-if="iframeLoading" class="global-node-modal__loading">
+          <div class="loading-spinner"></div>
+          <p>加载页面中...</p>
+        </div>
+        <iframe
+          v-if="selectedNode"
+          :src="selectedNode.id"
+          :key="selectedNode.id"
+          @load="iframeLoading = false"
+          @error="iframeLoading = false"
+          class="global-node-modal__iframe"
+          frameborder="0"
+          allowfullscreen
+        ></iframe>
       </div>
     </div>
   </div>
@@ -553,6 +668,220 @@ debug.log(TAG, "组件初始化完成");
   .graph-stats {
     justify-content: space-around;
     width: 100%;
+  }
+}
+
+
+/* 节点模态窗口样式 */
+.global-node-modal {
+  position: fixed;
+  z-index: 10001; /* 确保在全局图谱之上 */
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: modalFadeIn 0.3s ease;
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.global-node-modal__content {
+  background: var(--vp-c-bg);
+  border-radius: 12px;
+  width: 90vw;
+  height: 90vh;
+  max-width: 1200px;
+  display: flex;
+  flex-direction: column;
+  animation: modalScaleIn 0.3s ease;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+@keyframes modalScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.global-node-modal__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--vp-c-border);
+  background: var(--vp-c-bg-soft);
+  border-radius: 12px 12px 0 0;
+}
+
+.global-node-modal__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--vp-c-text-1);
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.global-node-modal__actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.global-node-modal__action-btn {
+  padding: 6px 12px;
+  background: var(--vp-c-brand);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.global-node-modal__action-btn:hover {
+  background: var(--vp-c-brand-dark);
+}
+
+.global-node-modal__close-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--vp-c-bg-soft);
+  border: 1px solid var(--vp-c-border);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.global-node-modal__close-btn:hover {
+  background: var(--vp-c-red-soft);
+  border-color: var(--vp-c-red);
+  color: var(--vp-c-red);
+}
+
+.global-node-modal__info {
+  padding: 16px 24px;
+  background: var(--vp-c-bg-soft);
+  border-bottom: 1px solid var(--vp-c-border);
+}
+
+.global-node-info__item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.global-node-info__item:last-child {
+  margin-bottom: 0;
+}
+
+.global-node-info__label {
+  font-weight: 500;
+  color: var(--vp-c-text-2);
+  min-width: 60px;
+  font-size: 12px;
+}
+
+.global-node-info__value {
+  color: var(--vp-c-text-1);
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.global-node-info__badge {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.global-node-info__badge.current {
+  background: var(--vp-c-green-soft);
+  color: var(--vp-c-green);
+}
+
+.global-node-info__badge.isolated {
+  background: var(--vp-c-yellow-soft);
+  color: var(--vp-c-yellow);
+}
+
+.global-node-info__badge:not(.current):not(.isolated) {
+  background: var(--vp-c-gray-soft);
+  color: var(--vp-c-text-2);
+}
+
+.global-node-modal__iframe-container {
+  flex: 1;
+  position: relative;
+  min-height: 0; /* 重要：允许iframe容器收缩 */
+}
+
+.global-node-modal__loading {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--vp-c-bg-soft);
+  z-index: 1;
+}
+
+.global-node-modal__iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  border-radius: 0 0 12px 12px;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .global-node-modal__content {
+    width: 95vw;
+    height: 95vh;
+    margin: 10px;
+  }
+  
+  .global-node-modal__header {
+    padding: 16px;
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
+  }
+  
+  .global-node-modal__title {
+    max-width: 100%;
+    text-align: center;
+  }
+  
+  .global-node-modal__info {
+    padding: 12px 16px;
   }
 }
 </style>
