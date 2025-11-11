@@ -1,8 +1,9 @@
-// stores/useBioChainStore.ts - 清理版本
+// stores/bioChain.ts
 import { defineStore } from "pinia";
 import type { BiGraphConfig, BioChainMapItem, MapNodeLink, Page, BiGraph } from "../types/index";
 import { BioChainService } from "../services/bio-chain-service";
 import { debug } from "../utils/debug";
+import { GlobalGraphService } from "../services/global-graph-service";
 
 const TAG = "useBioChainStore";
 
@@ -154,41 +155,38 @@ export const useBioChainStore = defineStore("bioChain", {
      * 加载全局图谱数据 - 简化版本
      */
     async loadGlobalGraphData(): Promise<void> {
-      if (this.isGlobalGraphLoading) {
-        debug.log(TAG, "全局图谱数据正在加载中，跳过重复加载");
-        return;
-      }
+  if (this.isGlobalGraphLoading) {
+    debug.log(TAG, "全局图谱数据正在加载中，跳过重复加载");
+    return;
+  }
 
-      debug.log(TAG, "开始加载全局图谱数据");
-      this.isGlobalGraphLoading = true;
-      this.globalGraphError = null;
+  debug.log(TAG, "开始加载全局图谱数据");
+  this.isGlobalGraphLoading = true;
+  this.globalGraphError = null;
 
-      try {
-        // 模拟异步加载
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // 这里应该调用实际的全局图谱服务
-        const data: MapNodeLink = { 
-          nodes: [], 
-          links: [] 
-        }; // 临时模拟数据
-        
-        // 验证数据
-        if (data && Array.isArray(data.nodes) && Array.isArray(data.links)) {
-          this.globalGraphData = data;
-          debug.log(TAG, "全局图谱数据加载成功");
-        } else {
-          throw new Error("全局图谱数据格式无效");
-        }
-      } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : "未知错误";
-        this.globalGraphError = errorMsg;
-        debug.error(TAG, "加载全局图谱数据失败", error);
-      } finally {
-        this.isGlobalGraphLoading = false;
-        debug.log(TAG, "全局图谱数据加载完成");
-      }
-    },
+  try {
+    // 实际调用全局图谱服务获取数据
+    const data = await GlobalGraphService.getGlobalGraph();
+    
+    // 验证数据
+    if (data && Array.isArray(data.nodes) && Array.isArray(data.links)) {
+      this.globalGraphData = data;
+      debug.log(TAG, "全局图谱数据加载成功", {
+        节点数: data.nodes.length,
+        链接数: data.links.length
+      });
+    } else {
+      throw new Error("全局图谱数据格式无效");
+    }
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : "未知错误";
+    this.globalGraphError = errorMsg;
+    debug.error(TAG, "加载全局图谱数据失败", error);
+  } finally {
+    this.isGlobalGraphLoading = false;
+    debug.log(TAG, "全局图谱数据加载完成");
+  }
+},
 
     /**
      * 重新加载全局图谱数据

@@ -1,7 +1,6 @@
 // services/bio-chain-service.ts - 清理版本
 import { useBioChainStore } from "../stores/bioChain";
 import type { Page } from "../types";
-// import { bioChainMap } from "../models/bio-chain-map";
 import { debug } from "../utils/debug";
 import type { MarkdownLink } from "vuepress/markdown";
 

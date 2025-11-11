@@ -1,22 +1,21 @@
-// builders/global-map-builder.ts
 import type { MapNodeLink, Node } from "../types";
-import { BaseMapBuilder } from "./base-map-builder";
+// import { BaseMapBuilder } from "./base-map-builder";
 import { debug } from "../utils/debug";
 import { useBioChainStore } from "../stores/bioChain";
-
+import { addNodeToGraph, updateLinkCounts } from "./base-map-builder";
 
 const TAG = "GlobalMapBuilder";
 
 /**
  * 全局图谱构建器
  */
-export class GlobalMapBuilder extends BaseMapBuilder {
+export class GlobalMapBuilder {
   /**
    * 构建全局图谱
    */
   public static build(): MapNodeLink {
     debug.log(TAG, "开始构建全局图谱");
-const bioStore = useBioChainStore();
+    const bioStore = useBioChainStore();
 
     const graph: MapNodeLink = {
       nodes: [],
@@ -38,7 +37,7 @@ const bioStore = useBioChainStore();
 
     // 先添加所有节点
     keys.forEach((path, index) => {
-      this.addNodeToGraph(graph, path);
+      addNodeToGraph(graph, path);
       if (index < 3) {
         debug.log(TAG, `添加节点 ${index + 1}/${keys.length}`, { 
           路径: path,
@@ -97,7 +96,7 @@ const bioStore = useBioChainStore();
     });
 
     // 更新节点的连接计数
-    this.updateLinkCounts(graph);
+    updateLinkCounts(graph);
 
     // 统计信息
     const isolatedNodes = graph.nodes.filter(n => n.isIsolated).length;
@@ -150,7 +149,7 @@ const bioStore = useBioChainStore();
     linkSet: Set<string>, 
     path: string
   ): void {
-const bioStore = useBioChainStore();
+    const bioStore = useBioChainStore();
     const bioItem = bioStore.bioChainMap[path];
     if (!bioItem) {
       debug.warn(TAG, `处理节点链接时未找到生物链项`, { 路径: path });
@@ -202,7 +201,7 @@ const bioStore = useBioChainStore();
     targetPath: string,
     linkType: 'outlink' | 'backlink'
   ): boolean {
-const bioStore = useBioChainStore();
+    const bioStore = useBioChainStore();
     // 检查链接目标是否存在
     if (!bioStore.bioChainMap[targetPath]) {
       debug.warn(TAG, `链接目标不存在`, { 

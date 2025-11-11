@@ -1,14 +1,14 @@
 // builders/local-map-builder.ts
 import type { LocalMapItem, MapNodeLink, QueueItem, Node } from "../types";
-import { BaseMapBuilder } from "./base-map-builder";
 import { optionsManager } from "../config/options";
 import { useBioChainStore } from "../stores/bioChain";
+import { updateLinkCounts } from "./base-map-builder";
 
 
 /**
  * 本地图谱构建器
  */
-export class LocalMapBuilder extends BaseMapBuilder {
+export class LocalMapBuilder {
   /**
    * 生成本地图谱
    */
@@ -159,7 +159,7 @@ const bioStore = useBioChainStore();
     });
 
     // 更新连接计数
-    this.updateLinkCounts(nodeLink);
+    updateLinkCounts(nodeLink);
 
     return nodeLink;
   }

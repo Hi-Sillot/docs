@@ -17,7 +17,7 @@ const router = useRouter();
 debug.log(TAG, "组件初始化开始", {
   hasBioStore: !!bioStore,
   hasRouter: !!router,
-  初始显示状态: bioStore.showGlobalGraph
+  初始显示状态: bioStore.showGlobalGraph,
 });
 
 // Refs
@@ -219,7 +219,7 @@ watch(isGraphLoading, (newLoading, oldLoading) => {
 
 // 生命周期
 onMounted(() => {
-  debug.log(TAG, "组件挂载");
+  debug.log(TAG, "组件挂载", bioStore.globalGraphData);
   
   // 重要修复：确保组件挂载时不会自动显示
   if (bioStore.showGlobalGraph) {
