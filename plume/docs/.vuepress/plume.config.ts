@@ -23,7 +23,12 @@ export default defineThemeConfig({
   appearance: true,  // 配置 深色模式
 
   social: [
-    { icon: 'github', link: 'https://github.com/Hi-Sillot/docs' },
+    { icon: 'github', link: 'https://github.com/Soltus' },
+    { icon: 'bilibili', link: 'https://space.bilibili.com/36046609' },
+    {
+        icon: { svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="currentColor"><path d="M192 32c0 17.7 14.3 32 32 32c123.7 0 224 100.3 224 224c0 17.7 14.3 32 32 32s32-14.3 32-32C512 128.9 383.1 0 224 0c-17.7 0-32 14.3-32 32zm0 96c0 17.7 14.3 32 32 32c70.7 0 128 57.3 128 128c0 17.7 14.3 32 32 32s32-14.3 32-32c0-106-86-192-192-192c-17.7 0-32 14.3-32 32zM96 144c0-26.5-21.5-48-48-48S0 117.5 0 144V368c0 79.5 64.5 144 144 144s144-64.5 144-144s-64.5-144-144-144H128v96h16c26.5 0 48 21.5 48 48s-21.5 48-48 48s-48-21.5-48-48V144z"></path></svg>', name: 'ld246' },
+        link: 'https://ld246.com/member/soltus'
+      },
   ],
   // navbarSocialInclude: ['github'], // 允许显示在导航栏的 social 社交链接
   aside: true, // 页内侧边栏， 默认显示在右侧
@@ -46,15 +51,24 @@ export default defineThemeConfig({
   // },
 
   /**
-   * @see https://theme-plume.vuejs.press/config/basic/#profile
+   * @see https://theme-plume.vuejs.press/config/theme/#profile
+   * 主题默认 profile 设置。此外每个 post 集合支持独立配置个人信息展示区域
+   * @param profile.avatar: 头像地址，用于右侧博主信息展示
+    @param profile.name: 名称， 用于右侧博主信息展示
+    @param profile.description: 个人描述，用于右侧博主信息展示
+    @param profile.circle: 是否为圆形头像
+    @param profile.location: 用户地理位置
+    @param profile.organization: 用户所在组织/公司
+    @param profile.layout: 个人信息展示在左侧还是右侧，'left' | 'right'
    */
   profile: {
-    avatar: 'https://theme-plume.vuejs.press/plume.png',
+    avatar: '/assets/icon.ico',
     name: '佚名',
-    description: '平平淡淡才是真',
+    // description: '平平淡淡才是真',
     // circle: true,
-    // location: '',
-    // organization: '',
+    layout: 'left',
+    // location: '地球',
+    organization: '海文东',
   },
 
   navbar,

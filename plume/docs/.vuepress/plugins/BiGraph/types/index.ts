@@ -2,6 +2,25 @@ import type * as vp from 'vuepress';
 import type { App, Plugin } from "vuepress/core";
 export type { App, Plugin };
 
+interface BiGraphStats {
+  totalPages: number;
+  validPages: number;
+  totalLinks: number;
+  pagesWithLinks: number;
+}
+
+export interface BiGraph {
+  pages: Page[];
+  pageCount: number;
+  validPageCount: number;
+  getPageByPath: (path: string) => Page | undefined;
+  getPageByPermalink: (permalink: string) => Page | undefined;
+  getAllPages: () => Page[];
+  getPageCount: () => number;
+  getValidPageCount: () => number;
+  stats: BiGraphStats;
+}
+
 /**
  * {
     raw: './foo.md',

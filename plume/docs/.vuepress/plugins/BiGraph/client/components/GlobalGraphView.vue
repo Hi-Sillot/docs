@@ -1,343 +1,595 @@
-<script lang="ts" setup>
-import {computed, nextTick, Ref, ref, watch} from "vue";
-// import {getGlobalGraph, showGlobalGraph} from "../useGlobalGraph.js";
-import {CanvasSize, MapNodeLink} from "../../types/index.js";
-import RelationGraph from "./RelationGraph.vue";
-import {useRouter, withBase} from "vuepress/client";
-import { useBioChainStore } from '../../../../stores/bioChain.js';
-const bioStore = useBioChainStore()
+<!-- components/GlobalGraphView.vue -->
+<script setup lang="ts">
+import { ref, computed, nextTick, onMounted, onUnmounted, watch } from "vue";
+import { useRouter } from "vuepress/client";
+import RelationGraph from "./RelationGraphCanvas.vue";
+import { debug } from "../../utils/debug";
+import { useBioChainStore } from "../../stores/bioChain";
+// import { useBioChainStore } from "../../stores/bio-chain-store";
 
-declare const __VUEPRESS_DEV__: boolean;
 
-const first_loaded = ref(false);
-const data: Ref<MapNodeLink | null> = ref(null);
-let is_loading = false;
-let resizeObserver: ResizeObserver | null = null;
-const containerRef = ref<HTMLElement | null>(null);
-const graphRef = ref<InstanceType<typeof RelationGraph> | null>(null);
-const canvasSize = ref<CanvasSize>({
-  width: 800,
-  height: 600,
-});
+const TAG = "GlobalGraphView";
+
+// Store 和 Router
+const bioStore = useBioChainStore();
 const router = useRouter();
 
-const isLoading = computed(() => !first_loaded.value && !data.value);
-const hasError = computed(() => first_loaded.value && !data.value);
-const showGlobalGraph = computed(() => bioStore.showGlobalGraph)
+debug.log(TAG, "组件初始化开始", {
+  hasBioStore: !!bioStore,
+  hasRouter: !!router,
+  初始显示状态: bioStore.showGlobalGraph
+});
+
+// Refs
+const containerRef = ref<HTMLElement | null>(null);
+const graphRef = ref<InstanceType<typeof RelationGraph> | null>(null);
+const canvasSize = ref({ width: 800, height: 600 });
+
+// 响应式数据
+const isLoading = ref(false);
+const hasError = ref(false);
+const errorMessage = ref<string | null>(null);
+
+// 计算属性 - 修复：确保 graphData 总是有默认值
+const showGlobalGraph = computed(() => bioStore.showGlobalGraph);
+const graphData = computed(() => bioStore.globalGraphData || { nodes: [], links: [] });
+const isGraphLoading = computed(() => bioStore.isGlobalGraphLoading);
+const graphStats = computed(() => {
+  const data = graphData.value || { nodes: [], links: [] };
+  return {
+    nodeCount: data.nodes?.length || 0,
+    linkCount: data.links?.length || 0,
+    isolatedCount: data.nodes?.filter((n: any) => n.isIsolated)?.length || 0,
+    isEmpty: !data.nodes || data.nodes.length === 0
+  };
+});
+
+debug.log(TAG, "计算属性初始化完成", {
+  showGlobalGraph: showGlobalGraph.value,
+  hasGraphData: !!bioStore.globalGraphData,
+  graphDataNodes: graphStats.value.nodeCount,
+  isGraphLoading: isGraphLoading.value
+});
+
+// 方法
+/**
+ * 处理节点点击
+ */
+const handleNodeClick = (path: string): void => {
+  debug.log(TAG, "处理节点点击", { 
+    点击路径: path,
+    当前路径: router.currentRoute.value.path
+  });
+  
+  try {
+    if (path && path !== router.currentRoute.value.path) {
+      router.push(path);
+      // 点击后关闭全局图谱
+      handleClose();
+      debug.log(TAG, "路由跳转完成，已关闭全局图谱");
+    }
+  } catch (error) {
+    debug.error(TAG, "节点点击处理失败", error);
+  }
+};
 
 /**
- * 获取全局图数据 如果已经获取过则直接返回
+ * 关闭全局图谱 - 修复：使用正确的方法
  */
-async function getGlobalGraphData() {
-  if (data.value || is_loading) return;
-
-  try {
-    is_loading = true;
-    data.value = bioStore.getGlobalMap()
-    // data.value = await getGlobalGraph(options.value.isDev, withBase, options.value.graphPath);
-  } finally {
-    is_loading = false;
-    first_loaded.value = true;
-  }
-}
+const handleClose = (): void => {
+  debug.log(TAG, "手动关闭全局图谱");
+  bioStore.hideGlobalGraphModal();
+  debug.log(TAG, "关闭后状态", { showGlobalGraph: bioStore.showGlobalGraph });
+};
 
 /**
  * 重新加载数据
  */
-const reloadData = async () => {
-  first_loaded.value = false;
-  data.value = null;
-  await getGlobalGraphData();
+const handleReload = async (): Promise<void> => {
+  debug.log(TAG, "手动重新加载全局图谱数据");
+  try {
+    await bioStore.reloadGlobalGraphData();
+    // 重新加载后重启模拟器
+    if (graphRef.value && graphStats.value.nodeCount > 0) {
+      nextTick(() => {
+        setTimeout(() => {
+          graphRef.value?.restartSimulation();
+          debug.log(TAG, "数据重新加载后重启模拟器");
+        }, 100);
+      });
+    }
+  } catch (error) {
+    debug.error(TAG, "重新加载数据失败", error);
+  }
 };
 
-// 更新画布尺寸的函数
-const updateCanvasSize = () => {
-  if (containerRef.value) {
-    const rect = containerRef.value.getBoundingClientRect();
-    canvasSize.value = {
-      width: Math.floor(rect.width),
-      height: Math.floor(rect.height),
-    };
-    // 重启力导向图模拟
+/**
+ * 重启模拟器
+ */
+const restartSimulation = (): void => {
+  if (graphRef.value && graphStats.value.nodeCount > 0) {
     nextTick(() => {
-      if (graphRef.value) {
-        graphRef.value.restartSimulation();
+      try {
+        graphRef.value?.restartSimulation();
+        debug.log(TAG, "手动重启模拟器成功");
+      } catch (error) {
+        debug.error(TAG, "重启模拟器失败", error);
       }
     });
   }
 };
 
-// 清理资源的函数
-const cleanup = () => {
-  // 清理窗口事件监听器
-  window.removeEventListener("resize", updateCanvasSize);
-  // 清理 ResizeObserver
-  if (resizeObserver) {
-    resizeObserver.disconnect();
-    resizeObserver = null;
+/**
+ * 更新画布尺寸
+ */
+const updateCanvasSize = (): void => {
+  if (containerRef.value) {
+    const rect = containerRef.value.getBoundingClientRect();
+    canvasSize.value = {
+      width: Math.max(100, Math.floor(rect.width)),
+      height: Math.max(100, Math.floor(rect.height))
+    };
+    
+    debug.log(TAG, "画布尺寸更新", canvasSize.value);
+    
+    // 重启力导向图模拟
+    nextTick(() => {
+      if (graphRef.value) {
+        graphRef.value.restartSimulation();
+        debug.log(TAG, "尺寸变化后重启模拟器");
+      }
+    });
   }
-  // 停止力导向图模拟
-  // @ts-ignore
-  graphRef.value?.stopSimulation?.();
 };
 
-// 初始化资源的函数
-const initialize = () => {
-  // 加窗口大小变化监听
-  window.addEventListener("resize", updateCanvasSize);
+// 监听器
+let resizeObserver: ResizeObserver | null = null;
 
-  // 初始化 ResizeObserver
+// 监听显示状态变化
+watch(showGlobalGraph, async (newValue, oldValue) => {
+  debug.log(TAG, "显示状态变化", { 
+    之前: oldValue, 
+    现在: newValue 
+  });
+  
+  if (newValue) {
+    // 显示全局图谱时加载数据
+    debug.log(TAG, "显示全局图谱，开始加载数据");
+    isLoading.value = true;
+    hasError.value = false;
+    errorMessage.value = null;
+    
+    try {
+      await bioStore.loadGlobalGraphData();
+      
+      // 检查数据是否有效
+      if (graphStats.value.nodeCount === 0) {
+        debug.warn(TAG, "加载的全局图谱数据为空");
+      }
+      
+      // 数据加载完成后更新UI
+      nextTick(() => {
+        updateCanvasSize();
+        setTimeout(restartSimulation, 200);
+      });
+      
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : "加载失败";
+      hasError.value = true;
+      errorMessage.value = errorMsg;
+      debug.error(TAG, "显示全局图谱时加载数据失败", error);
+    } finally {
+      isLoading.value = false;
+      debug.log(TAG, "全局图谱数据显示处理完成", {
+        成功: !hasError.value,
+        错误: errorMessage.value,
+        节点数: graphStats.value.nodeCount
+      });
+    }
+  } else {
+    // 隐藏全局图谱时的清理工作
+    debug.log(TAG, "隐藏全局图谱，执行清理工作");
+  }
+});
+
+// 监听数据变化
+watch(graphData, (newData, oldData) => {
+  debug.log(TAG, "图谱数据变化", {
+    旧节点数: oldData?.nodes?.length || 0,
+    新节点数: newData?.nodes?.length || 0,
+    旧链接数: oldData?.links?.length || 0,
+    新链接数: newData?.links?.length || 0
+  });
+  
+  if (newData && newData.nodes && newData.nodes.length > 0) {
+    // 数据有效，重启模拟器
+    nextTick(() => {
+      setTimeout(restartSimulation, 100);
+    });
+  }
+});
+
+// 监听加载状态
+watch(isGraphLoading, (newLoading, oldLoading) => {
+  debug.log(TAG, "加载状态变化", { 
+    之前: oldLoading, 
+    现在: newLoading 
+  });
+});
+
+// 生命周期
+onMounted(() => {
+  debug.log(TAG, "组件挂载");
+  
+  // 重要修复：确保组件挂载时不会自动显示
+  if (bioStore.showGlobalGraph) {
+    debug.warn(TAG, "组件挂载时发现全局图谱已显示，正在重置状态");
+    bioStore.hideGlobalGraphModal();
+  }
+  
+  // 设置 ResizeObserver 监听容器尺寸变化
   resizeObserver = new ResizeObserver(() => {
     updateCanvasSize();
   });
-
-  // 开始观察容器元素
+  
   if (containerRef.value) {
     resizeObserver.observe(containerRef.value);
+    debug.log(TAG, "ResizeObserver 已监听容器");
   }
+  
+  // 初始更新尺寸
+  updateCanvasSize();
+});
 
-  // 初始计算尺寸
-  nextTick(() => {
-    updateCanvasSize();
-  });
-};
+onUnmounted(() => {
+  debug.log(TAG, "组件卸载");
+  
+  if (resizeObserver) {
+    resizeObserver.disconnect();
+    debug.log(TAG, "ResizeObserver 已断开");
+  }
+});
 
-watch(
-  showGlobalGraph,
-    // showGlobalGraph,
-    async (newValue) => {
-      if (newValue) {
-        await getGlobalGraphData();
-        initialize();
-      } else {
-        cleanup();
-      }
-    },
-    {immediate: true}
-);
-
-const handleNodeClick = (path: string) => {
-  router.push(`/${path}`);
-  // showGlobalGraph.value = false;
-  bioStore.showGlobalGraph = false;
-};
+debug.log(TAG, "组件初始化完成");
 </script>
 
 <template>
+  <!-- 全局图谱遮罩层 -->
   <div
-      v-if="showGlobalGraph"
-      id="globalGraphMask"
-      @click.self="bioStore.showGlobalGraph = false"
+    v-if="showGlobalGraph"
+    class="global-graph-mask"
+    @click.self="handleClose"
   >
-    <div id="globalGraphContainer" ref="containerRef">
-      <button class="fullscreen-map-button" @click="bioStore.showGlobalGraph = false">
-        <svg
-            fill="none"
-            height="24"
-            stroke-width="1.5"
-            viewBox="0 0 24 24"
-            width="24"
-            xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-              d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z"
-              stroke="currentColor"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-          />
-          <path
-              d="M15 16L9 8"
-              stroke="currentColor"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-          />
-          <path
-              d="M9 16L15 8"
-              stroke="currentColor"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-          />
+    <div
+      ref="containerRef"
+      class="global-graph-container"
+    >
+      <!-- 关闭按钮 - 修复：确保事件绑定正确 -->
+      <button class="global-graph-close" @click="handleClose" title="关闭全局图谱">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M18 6L6 18M6 6l12 12" stroke-width="2" stroke-linecap="round"/>
         </svg>
       </button>
 
-      <!-- 加载动画 -->
-      <div v-if="isLoading" class="loading-container">
+      <!-- 加载状态 -->
+      <div v-if="isGraphLoading || isLoading" class="global-graph-loading">
         <div class="loading-spinner"></div>
+        <p>加载全局图谱中...</p>
+        <div class="loading-details" v-if="graphStats.nodeCount > 0">
+          <p>已加载节点: {{ graphStats.nodeCount }}</p>
+          <p>已加载链接: {{ graphStats.linkCount }}</p>
+        </div>
       </div>
 
-      <!-- 错误提示 -->
-      <div v-else-if="hasError" class="error-container">
-        <svg
-            class="error-icon"
-            fill="none"
-            height="48"
-            stroke-width="1.5"
-            viewBox="0 0 24 24"
-            width="48"
-            xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-              d="M14 11.9976C14 9.5059 11.683 7 8.85714 7C8.52241 7 7.41904 7.00001 7.14286 7.00001C4.30254 7.00001 2 9.23752 2 11.9976C2 14.376 3.70973 16.3664 6 16.8714C6.36756 16.9525 6.75006 16.9952 7.14286 16.9952"
-              stroke="currentColor"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-          />
-          <path
-              d="M16.8571 6.99996C17.2499 6.99996 17.6324 7.04275 18 7.1238C20.2903 7.62881 22 9.61917 22 11.9976C22 13.4395 21.3716 14.7388 20.3664 15.651"
-              stroke="currentColor"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-          />
-          <path
-              d="M10.0002 11.9976C10.0002 14.4893 12.3172 16.9952 15.1431 16.9952"
-              stroke="currentColor"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-          />
-          <path
-              d="M18 22.2426L20.1213 20.1213M20.1213 20.1213L22.2426 18M20.1213 20.1213L18 18M20.1213 20.1213L22.2426 22.2426"
-              stroke="currentColor"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-          />
-        </svg>
-        <p class="error-text">数据加载失败</p>
-        <button class="retry-button" @click="reloadData">重新加载</button>
+      <!-- 错误状态 -->
+      <div v-else-if="hasError || bioStore.globalGraphError" class="global-graph-error">
+        <div class="error-icon">⚠️</div>
+        <p class="error-title">全局图谱加载失败</p>
+        <p class="error-message">{{ errorMessage || bioStore.globalGraphError }}</p>
+        <button @click="handleReload" class="retry-button">重新加载</button>
       </div>
 
-      <relation-graph
-          v-if="data"
+      <!-- 空数据状态 -->
+      <div v-else-if="graphStats.isEmpty" class="global-graph-empty">
+        <div class="empty-icon">📊</div>
+        <p class="empty-title">暂无全局图谱数据</p>
+        <p class="empty-message">可能是数据尚未生成或生成过程中出现错误</p>
+        <button @click="handleReload" class="retry-button">重新加载</button>
+      </div>
+
+      <!-- 正常状态 -->
+      <div v-else class="global-graph-content">
+        <!-- 图谱信息栏 -->
+        <div class="graph-info-panel">
+          <div class="graph-stats">
+            <span class="stat-item">节点: {{ graphStats.nodeCount }}</span>
+            <span class="stat-item">链接: {{ graphStats.linkCount }}</span>
+            <span class="stat-item"> 
+              孤立节点: {{ graphStats.isolatedCount }}
+            </span>
+          </div>
+          <div class="graph-actions">
+            <button @click="handleReload" class="action-button" title="重新加载数据">
+              🔄
+            </button>
+            <button @click="restartSimulation" class="action-button" title="重新布局">
+              🔄
+            </button>
+          </div>
+        </div>
+
+        <!-- 关系图谱组件 -->
+        <RelationGraph
           ref="graphRef"
+          :key="'global-graph-' + canvasSize.width + '-' + canvasSize.height"
           :canvas-height="canvasSize.height"
           :canvas-width="canvasSize.width"
           :current-path="router.currentRoute.value.path"
-          :data="data"
+          :data="graphData"
           @node-click="handleNodeClick"
-      ></relation-graph>
+        />
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.fullscreen-map-button {
-  position: absolute;
-  z-index: 10;
-  top: 8px;
-  right: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 6px;
-  background: var(--vp-c-bg);
-}
-
-.fullscreen-map-button:hover {
-  transform: scale(1.05);
-  background: var(--vp-c-bg-soft);
-}
-
-.fullscreen-map-button svg {
-  width: 16px;
-  height: 16px;
-  opacity: 0.75;
-}
-
-.fullscreen-map-button:hover svg {
-  opacity: 1;
-}
-
-#globalGraphMask {
+/* 样式保持不变，与之前相同 */
+.global-graph-mask {
   position: fixed;
-  z-index: 1000;
+  z-index: 10000;
   top: 0;
   right: 0;
   bottom: 0;
   left: 0;
-  background: rgba(0, 0, 0, 0.5);
-}
-
-#globalGraphContainer {
-  position: fixed;
-  z-index: 1001;
-  top: 2%;
-  left: 6%;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 88%;
-  height: 95%;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.global-graph-container {
+  position: relative;
+  width: 95vw;
+  height: 95vh;
+  max-width: 1400px;
+  max-height: 900px;
+  background: var(--vp-c-bg);
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  animation: scaleIn 0.3s ease;
+}
+
+@keyframes scaleIn {
+  from { 
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to { 
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.global-graph-close {
+  position: absolute;
+  z-index: 10;
+  top: 16px;
+  right: 16px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--vp-c-bg-soft);
+  border: 1px solid var(--vp-c-border);
   border-radius: 8px;
-  background-color: var(--vp-c-bg);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: var(--vp-c-text-1);
 }
 
-.loading-container {
+.global-graph-close:hover {
+  background: var(--vp-c-bg-soft);
+  transform: scale(1.05);
+  border-color: var(--vp-c-brand);
+}
+
+.global-graph-content {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.graph-info-panel {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 5;
+  background: rgba(var(--vp-c-bg-soft), 0.9);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--vp-c-border);
+  border-radius: 8px;
+  padding: 12px 16px;
   display: flex;
   align-items: center;
-  flex-direction: column;
+  gap: 16px;
+  font-size: 14px;
+}
+
+.graph-stats {
+  display: flex;
+  gap: 16px;
+  color: var(--vp-c-text-2);
+}
+
+.stat-item {
+  font-weight: 500;
+}
+
+.graph-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.action-button {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
   justify-content: center;
-  color: var(--vp-c-text-1);
+  background: var(--vp-c-bg);
+  border: 1px solid var(--vp-c-border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 14px;
+}
+
+.action-button:hover {
+  background: var(--vp-c-bg-soft);
+  border-color: var(--vp-c-brand);
+}
+
+/* 加载状态样式 */
+.global-graph-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--vp-c-text-2);
   gap: 16px;
 }
 
 .loading-spinner {
-  display: inline-block;
   width: 40px;
   height: 40px;
-  animation: loading-spin 0.8s linear infinite;
-  border: 4px solid transparent;
-  border-top-color: var(--vp-c-brand);
-  border-right-color: var(--vp-c-brand);
+  border: 3px solid transparent;
+  border-top: 3px solid var(--vp-c-brand);
+  border-right: 3px solid var(--vp-c-brand);
   border-radius: 50%;
+  animation: spin 1s linear infinite;
 }
 
-@keyframes loading-spin {
-  from {
-    transform: rotate(0);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
-.error-container {
+.loading-details {
+  text-align: center;
+  font-size: 12px;
+  color: var(--vp-c-text-3);
+}
+
+/* 错误状态样式 */
+.global-graph-error {
   display: flex;
-  align-items: center;
   flex-direction: column;
+  align-items: center;
   justify-content: center;
-  color: var(--vp-c-text-1);
+  height: 100%;
+  color: var(--vp-c-red);
   gap: 16px;
+  text-align: center;
+  padding: 40px;
 }
 
-.error-text {
-  font-size: 1.2rem;
+.error-icon {
+  font-size: 48px;
+  margin-bottom: 8px;
+}
+
+.error-title {
+  font-size: 18px;
   font-weight: 600;
   margin: 0;
 }
 
+.error-message {
+  color: var(--vp-c-text-2);
+  margin: 0;
+  max-width: 400px;
+  line-height: 1.5;
+}
+
+/* 空状态样式 */
+.global-graph-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--vp-c-text-3);
+  gap: 16px;
+  text-align: center;
+  padding: 40px;
+}
+
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 8px;
+}
+
+.empty-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.empty-message {
+  margin: 0;
+  max-width: 400px;
+  line-height: 1.5;
+}
+
+/* 重试按钮 */
 .retry-button {
   padding: 8px 16px;
+  background: var(--vp-c-brand);
+  color: white;
+  border: none;
+  border-radius: 6px;
   cursor: pointer;
-  transition: all 0.2s;
-  color: var(--vp-c-text-1);
-  border: 1px solid var(--vp-c-accent);
-  border-radius: 4px;
-  background: var(--vp-c-bg);
+  font-size: 14px;
+  transition: background-color 0.2s;
+  margin-top: 8px;
 }
 
 .retry-button:hover {
-  transform: scale(1.05);
-  background: var(--vp-c-bg-soft);
+  background: var(--vp-c-brand-dark);
 }
 
-.error-icon {
-  width: 48px;
-  height: 48px;
-  color: var(--vp-c-text-1);
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .global-graph-container {
+    width: 100vw;
+    height: 100vh;
+    border-radius: 0;
+    max-width: none;
+    max-height: none;
+  }
+  
+  .graph-info-panel {
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .graph-stats {
+    justify-content: space-around;
+    width: 100%;
+  }
 }
 </style>

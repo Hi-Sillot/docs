@@ -1,7 +1,8 @@
+<!-- components/LocalGraphView.vue -->
 <script setup lang="ts">
 import { ref, nextTick, onMounted, onUnmounted, watch } from "vue";
 import { useRouter } from "vuepress/client";
-import RelationGraph from "./RelationGraph.vue";
+import RelationGraph from "./RelationGraphCanvas.vue";
 import GraphButtons from "./GraphButtons.vue";
 import ToggleButton from "./ToggleButton.vue";
 import { useGraphData } from "../composables/useGraphData";
@@ -9,15 +10,15 @@ import { useGraphOptions } from "../composables/useGraphOptions";
 import { useScreenSize } from "../composables/useScreenSize";
 import { useContainerSize } from "../composables/useContainerSize";
 import { useFullscreen } from "../composables/useFullscreen";
-import { useBioChainStore } from '../../../../stores/bioChain';
+import { useBioChainStore } from "../../stores/bioChain";
+// import { useBioChainStore } from "../../stores/bio-chain-store";
 
+let TAG = "LocalGraphView.vue"
 // 日志计数器
 let logCounter = 0;
 function log(step: string, data?: any) {
-  console.log(`${++logCounter}. [RelationshipMap] ${step}`, data ? data : '');
+  console.log(`[${TAG}] ${++logCounter}. [RelationshipMap] ${step}`, data ? data : '');
 }
-
-log("RelationshipMap 组件开始初始化");
 
 // Store
 const bioStore = useBioChainStore();
@@ -34,7 +35,6 @@ const graphRef = ref<InstanceType<typeof RelationGraph> | null>(null);
 const fullscreenGraphRef = ref<InstanceType<typeof RelationGraph> | null>(null);
 
 // Composables
-log("开始初始化 Composables");
 const { mapData, isLoading, error, handleNodeClick, shouldFoldEmptyGraph, reloadData } = useGraphData();
 const { options } = useGraphOptions();
 const { screenState, toggleExpand, forceUpdateContainerWidth } = useScreenSize();
@@ -43,11 +43,6 @@ const { fullscreenState, toggleFullscreen } = useFullscreen(fullscreenContainerR
 
 log("Composables 初始化完成", {
   mapData: mapData.value,
-  isLoading: isLoading.value,
-  error: error.value,
-  shouldFoldEmptyGraph: shouldFoldEmptyGraph.value,
-  options: options,
-  screenState: screenState,
   canvasSize: canvasSize.value,
   fullscreenState: fullscreenState.value
 });
@@ -215,7 +210,7 @@ onMounted(() => {
             height: entry.contentRect.height
           });
           // 容器尺寸变化后重启模拟器
-          if (!isLoading.value) {
+          if (!isLoading.valueOf) {
             nextTick(() => {
               restartSimulation();
             });
@@ -226,7 +221,7 @@ onMounted(() => {
             height: entry.contentRect.height
           });
           // 全屏容器尺寸变化后重启模拟器
-          if (!isLoading.value) {
+          if (!isLoading.valueOf) {
             nextTick(() => {
               restartFullscreenSimulation();
             });
@@ -243,7 +238,7 @@ onMounted(() => {
     }
 
     // 初始启动模拟器（等数据加载完成）
-    if (!isLoading.value) {
+    if (!isLoading.valueOf) {
       nextTick(() => {
         setTimeout(() => {
           restartSimulation();
@@ -275,11 +270,11 @@ onUnmounted(() => {
   }
 });
 
-log("RelationshipMap 组件初始化完成");
+log(`${TAG} 组件初始化完成`);
 </script>
 
 <template>
-  <!-- 主容器 -->
+  <!-- 主容器，显示在文章右侧 -->
   <div v-if="shouldFoldEmptyGraph" class="relationship-map">
 
     <!-- 切换按钮 -->
@@ -331,6 +326,14 @@ log("RelationshipMap 组件初始化完成");
         <button @click="handleReload" class="relationship-map__retry-btn">
           重新加载
         </button>
+        <!-- 功能按钮 -->
+        <GraphButtons
+          :enable-global-graph="options.enableGlobalGraph"
+          @fullscreen="safeToggleFullscreen"
+          @global="bioStore.showGlobalGraph = true"
+          @close="fullscreenState.isFullscreen = false"
+          @reload="handleReload"
+        />
       </div>
 
       <!-- 正常状态 -->

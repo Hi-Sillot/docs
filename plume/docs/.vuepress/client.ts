@@ -14,9 +14,12 @@ import C from "./components/Const.vue"
 
 import { createPinia } from "pinia";
 import { useAuthorStore } from "./stores/author";
-import { useBioChainStore } from "./stores/bioChain";
 
 import "./styles/index.css";
+import { useBioChainStore } from "./plugins/BiGraph/stores/bioChain";
+// import { useBioChainStore } from "./plugins/BiGraph/stores/bio-chain-store";
+import { TEMP_FILE_NAMES } from "./plugins/BiGraph/constants/index";
+import { BioChainService } from "./plugins/BiGraph/services/bio-chain-service";
 
 export default defineClientConfig({
   setup() {
@@ -65,11 +68,14 @@ export default defineClientConfig({
     // 初始化存储
     const bioStore = useBioChainStore();
     // @ts-ignore
-    import("@temp/bio.ts").then((module) => {
-      console.log("@temp/bio.ts ok", module.f(bioStore, app));
+    import(`./.temp/${TEMP_FILE_NAMES.BIO_TS}.js`).then((module) => {
+      console.log(`@temp/${TEMP_FILE_NAMES.BIO_TS}.js ok`, {
+            页面数: module.pageCount,
+            有效页面数: module.validPageCount
+          }, module.default);
       // 将数据存入Pinia存储
-      // bioStore.setPageData(module.default)
-      // bioStore.generateLocalMap(module.default)
+      bioStore.BiGraph = module.default
+      BioChainService.build(bioStore.BiGraph!.getAllPages())
     });
   },
 })

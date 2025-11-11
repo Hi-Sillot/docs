@@ -14,14 +14,14 @@ import { defineUserConfig } from 'vuepress'
 import { plumeTheme } from 'vuepress-theme-plume'
 import { llmsPlugin } from '@vuepress/plugin-llms' // 为你的站点添加 llms.txt，以提供对 LLM 友好的内容。https://ecosystem.vuejs.press/zh/plugins/ai/llms.html
 import { revealJsPlugin } from '@vuepress/plugin-revealjs' // 在你的 VuePress 中添加幻灯片
-import BiGraph from "./plugins/BiGraph/node/index";
+import BiGraph from "./plugins/BiGraph/client/index";
 import AuthorPlugin from './plugins/Author/authorData'
 
 export default defineUserConfig({
   port:5858,
   base: '/', // https://theme-plume.vuejs.press/guide/deployment/#github-pages
   lang: 'zh-CN',
-  title: '汐洛文档 🦢',
+  title: '汐洛 🦢',
   description: '平平淡淡才是真',
 
   head: [
@@ -60,6 +60,14 @@ export default defineUserConfig({
       // 插件选项
     }),
   ],
+
+  
+  // 在构建开始时，顺序在 plugins 之后
+  onInitialized: (app) => {
+    if (process.env.NODE_ENV === 'production') {
+      // console.log('开始执行构建时任务')
+    }
+  },
 
   // 现在任何带有 `.snippet.md` 扩展名的文件都不会呈现为页面
   pagePatterns: ['**/*.md', '!**/*.snippet.md', '!.vuepress', '!node_modules'],

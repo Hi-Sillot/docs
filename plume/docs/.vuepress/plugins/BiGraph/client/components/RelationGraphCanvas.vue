@@ -1,3 +1,4 @@
+<!-- components/RelationGraphCanvas.vue -->
 <script setup lang="ts">
 import * as d3 from "d3";
 import { computed, onMounted, onUnmounted, ref, watch, nextTick } from "vue";
@@ -22,11 +23,15 @@ const emit = defineEmits<{
 }>();
 
 const props = defineProps<{
-  data: MapNodeLink;
+  data: MapNodeLink | null;  // 修改：允许为 null
   currentPath?: string;
   canvasWidth: number;
   canvasHeight: number;
 }>();
+// 计算属性 - 修复：处理 null 数据
+const effectiveData = computed(() => {
+  return props.data || { nodes: [], links: [] };
+});
 
 log("组件初始化开始", { 
   propsData: props.data, 
@@ -358,7 +363,7 @@ onMounted(() => {
 
   // 初始化数据
   log("开始初始化地图数据");
-  initializeMapData(props.data, props.currentPath);
+  initializeMapData(effectiveData.value, props.currentPath);
 
   // 设置主题观察器
   const styleObserver = setupThemeObserver(ticked);
@@ -378,9 +383,6 @@ onMounted(() => {
   log("开始设置事件监听");
   setupEventListeners();
 
-  // 暴露方法
-  //@ts-ignore
-  window.simulation = simulation.value;
   log("onMounted 执行完成");
 });
 
@@ -403,8 +405,9 @@ watch(() => canvasSize.value, (newSize, oldSize) => {
   }
 });
 
-watch([() => props.data, () => props.currentPath], ([newData, newPath], [oldData, oldPath]) => {
-  log("props.data 或 props.currentPath 变化", { 
+// 监听器 - 修复：使用 effectiveData
+watch([() => effectiveData.value, () => props.currentPath], ([newData, newPath], [oldData, oldPath]) => {
+  log("数据或当前路径变化", { 
     oldData, 
     newData, 
     oldPath, 

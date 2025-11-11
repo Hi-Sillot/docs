@@ -17,7 +17,7 @@ export const DEFAULT_CONFIG = {
  * 临时文件名称
  */
 export const TEMP_FILE_NAMES = {
-  BIO_TS: "bio.ts",
+  BIO_TS: "BioGraph",
 };
 
 /**

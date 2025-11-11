@@ -1,19 +1,21 @@
 // builders/local-map-builder.ts
-
-import type { LocalMapItem, MapNodeLink, QueueItem, Node, BioChainMapItem } from "../types";
-import { bioChainMap } from "../models/bio-chain-map";
+import type { LocalMapItem, MapNodeLink, QueueItem, Node } from "../types";
+import { BaseMapBuilder } from "./base-map-builder";
 import { optionsManager } from "../config/options";
+import { useBioChainStore } from "../stores/bioChain";
+
 
 /**
  * 本地图谱构建器
  */
-export class LocalMapBuilder {
+export class LocalMapBuilder extends BaseMapBuilder {
   /**
    * 生成本地图谱
    */
   public static generate(root: string): MapNodeLink {
+const bioStore = useBioChainStore();
     // 检查根路径是否存在
-    if (!bioChainMap[root]) {
+    if (!bioStore.bioChainMap[root]) {
       console.warn(`根路径不存在于映射中: ${root}`);
       return { nodes: [], links: [] };
     }
@@ -36,6 +38,7 @@ export class LocalMapBuilder {
     visited: Set<string>,
     maxDeep: number
   ): void {
+const bioStore = useBioChainStore();
     while (queue.length > 0) {
       const { permalink, depth } = queue.shift()!;
 
@@ -47,38 +50,35 @@ export class LocalMapBuilder {
       
       // 添加当前节点到本地映射
       if (!this.addNodeToLocalMap(localMap, permalink)) {
-        continue; // 如果节点添加失败，跳过处理其链接
+        continue;
       }
 
-      const bioItem = bioChainMap[permalink];
+      const bioItem = bioStore.bioChainMap[permalink];
       if (!bioItem) continue;
 
       // 处理出链
-      this.processLinks(localMap, queue, visited, permalink, bioItem.outlink || [], depth, maxDeep, 'outlink');
+      this.processLinks(localMap, queue, visited, permalink, bioItem.outlink, depth, maxDeep, 'outlink');
       
       // 处理入链
-      this.processLinks(localMap, queue, visited, permalink, bioItem.backlink || [], depth, maxDeep, 'backlink');
+      this.processLinks(localMap, queue, visited, permalink, bioItem.backlink, depth, maxDeep, 'backlink');
     }
   }
 
   /**
    * 添加节点到本地映射
-   * @returns 是否成功添加
    */
   private static addNodeToLocalMap(localMap: Record<string, LocalMapItem>, permalink: string): boolean {
-    const bioItem: BioChainMapItem = bioChainMap[permalink];
+const bioStore = useBioChainStore();
+    const bioItem = bioStore.bioChainMap[permalink];
     if (!bioItem) {
       console.warn(`无法找到路径对应的生物链项: ${permalink}`);
       return false;
     }
 
     localMap[permalink] = {
-      title: bioItem.title,
-      filePathRelative: bioItem.filePathRelative,
-      htmlFilePathRelative: bioItem.htmlFilePathRelative,
-      permalink: bioItem.permalink,
-      outlink: bioItem.outlink,
-      backlink: bioItem.backlink,
+      ...bioItem,
+      outlink: [...bioItem.outlink], // 复制数组
+      backlink: [...bioItem.backlink] // 复制数组
     };
 
     return true;
@@ -99,16 +99,12 @@ export class LocalMapBuilder {
   ): void {
     const nextDepth = currentDepth + 1;
     
+const bioStore = useBioChainStore();
     links.forEach((link) => {
       // 检查链接目标是否存在
-      if (!bioChainMap[link]) {
+      if (!bioStore.bioChainMap[link]) {
         console.warn(`链接目标不存在: ${link} (来自 ${currentPath})`);
         return;
-      }
-
-      // 将链接添加到当前节点的对应链接数组中
-      if (localMap[currentPath]) {
-        localMap[currentPath][linkType].push(link);
       }
 
       // 如果目标节点未被访问且未超过最大深度，加入队列
@@ -127,7 +123,7 @@ export class LocalMapBuilder {
       links: [],
     };
 
-    const linkSet = new Set<string>(); // 用于链接去重
+    const linkSet = new Set<string>();
 
     Object.keys(localMap).forEach((key) => {
       const item = localMap[key];
@@ -135,16 +131,9 @@ export class LocalMapBuilder {
       // 创建节点
       const node: Node = {
         id: key,
-        value: { 
-          title: item.title,
-          filePathRelative: item.filePathRelative,
-          htmlFilePathRelative: item.htmlFilePathRelative,
-          permalink: item.permalink,
-          outlink: item.outlink,
-          backlink: item.backlink
-        },
+        value: item,
         linkCount: 0,
-        isCurrent: false, // 将在外部设置
+        isCurrent: false,
         isIsolated: false
       };
       
@@ -153,16 +142,16 @@ export class LocalMapBuilder {
       // 处理出链
       item.outlink.forEach((target) => {
         const linkKey = `${key}->${target}`;
-        if (!linkSet.has(linkKey) && localMap[target]) { // 确保目标节点在本地图中
+        if (!linkSet.has(linkKey) && localMap[target]) {
           linkSet.add(linkKey);
           nodeLink.links.push({ source: key, target: target });
         }
       });
 
-      // 处理入链（注意方向）
+      // 处理入链
       item.backlink.forEach((source) => {
         const linkKey = `${source}->${key}`;
-        if (!linkSet.has(linkKey) && localMap[source]) { // 确保源节点在本地图中
+        if (!linkSet.has(linkKey) && localMap[source]) {
           linkSet.add(linkKey);
           nodeLink.links.push({ source: source, target: key });
         }
@@ -170,22 +159,8 @@ export class LocalMapBuilder {
     });
 
     // 更新连接计数
-    nodeLink.nodes.forEach((node) => {
-      node.linkCount = nodeLink.links.filter(link => 
-        link.source === node.id || link.target === node.id
-      ).length;
-      node.isIsolated = node.linkCount === 0;
-    });
+    this.updateLinkCounts(nodeLink);
 
     return nodeLink;
-  }
-
-  /**
-   * 设置当前节点标记
-   */
-  public static setCurrentNode(graph: MapNodeLink, currentPath: string): void {
-    graph.nodes.forEach(node => {
-      node.isCurrent = node.id === currentPath;
-    });
   }
 }

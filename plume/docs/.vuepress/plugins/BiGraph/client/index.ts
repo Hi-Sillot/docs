@@ -11,16 +11,19 @@ import type { App, Page, Plugin } from "vuepress/core";
 import { BiGraphConfig } from "../types";
 // import type { BiGraphConfig, Plugin } from "../types";
 import { ConfigManager } from "./config-manager";
-import { TempFileWriter } from "./temp-file-writer";
-import { injectGlobalVariables, VariableInjector } from "./variable-injector";
 import { BioChainService } from "../services/bio-chain-service";
+import { debug } from '../utils/debug';
+import { GlobalMapBuilder } from "../builders/global-map-builder";
+import { TempFileWriter } from "./temp-file-writer";
 
 // const __dirname = getDirname(import.meta.url);
 export let options: BiGraphConfig = {};
 const graph_path = { target: "" };
+const TAG = "BiGraph";
+
 
 /**
- * 双链图谱插件
+ * 双链图谱插件入口
  */
 const BiGraph = (config: BiGraphConfig = {}): Plugin => ({
     // return {
@@ -30,36 +33,37 @@ const BiGraph = (config: BiGraphConfig = {}): Plugin => ({
      * 应用初始化完成时的钩子
      */
     async onInitialized(app) {
-        // Object.assign(bioChainMap, {});
-        // options = config
-        // if (config.titleGetter) {
-        //     buildBioChainMap(app.pages, config.titleGetter);
-        // } else {
-        //     buildBioChainMap(app.pages);
-        // }
+        debug.log('BiGraph', 'onInitialized 开始', {
+        pageCount: app.pages.length,
+        appInfo: {
+          base: app.options.base,
+          dest: app.options.dest,
+          temp: app.dir.temp()
+        }
+      });
 
-        // graph_path.target = writeTempGlobalGraph(app);
 
-        // 写入TS格式的临时文件
-        await TempFileWriter.writeBioTempFile(app);
-        // await app.writeTemp(
-        //     "bio.ts",
-        //     `
-        // const pages = ${JSON.stringify((app.pages))}
-        // export async function f(store, app) {
-        //         store.initializeBioChain(pages);  // 初始化双链映射
-        //         // pages.forEach(page => store.formatAndStorePageData(page));  // 处理页面数据
-        // }`,
-        //     // export default ${JSON.stringify(writeGlobalGraph(app))};`
-        // );
+        // 持久化到本地，应当只在构建时执行
+        // TODO
+
+         // 写入临时文件
+        await TempFileWriter.writeTempFile(app);
+
     },
 
     // 在页面准备完成后构建双链数据
     onPrepared: async (app: App) => {
-      const pages = app.pages;
-      await BioChainService.build(pages);
-      // 注入客户端全局变量
-      clientConfigFile: await injectGlobalVariables(app)
+         debug.log('BiGraph', 'onPrepared 开始', { 
+        pageCount: app.pages.length,
+        samplePages: app.pages.slice(0, 3).map(p => ({
+          path: p.path,
+          title: p.title,
+          permalink: p.permalink,
+          linksCount: p.links?.length || 0
+        }))
+      });
+
+
     },
     
   
@@ -67,7 +71,7 @@ const BiGraph = (config: BiGraphConfig = {}): Plugin => ({
      * 站点生成完成时的钩子
      */
     onGenerated: async (app: App) => {
-        //
+        console.log("站点生成完成时的钩子")
     },
     /**
      * 定义客户端变量
@@ -89,7 +93,10 @@ const BiGraph = (config: BiGraphConfig = {}): Plugin => ({
         // __RELATIONAL_GRAPH_GRAPH_PATH: graph_path,
     },
     // };
+
+    
 });
+
 
 export default BiGraph;
 
