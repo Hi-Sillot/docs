@@ -89,33 +89,8 @@ const handleReload = async (): Promise<void> => {
   debug.log(TAG, "手动重新加载全局图谱数据");
   try {
     await bioStore.reloadGlobalGraphData();
-    // 重新加载后重启模拟器
-    if (graphRef.value && graphStats.value.nodeCount > 0) {
-      nextTick(() => {
-        setTimeout(() => {
-          graphRef.value?.restartSimulation();
-          debug.log(TAG, "数据重新加载后重启模拟器");
-        }, 100);
-      });
-    }
   } catch (error) {
     debug.error(TAG, "重新加载数据失败", error);
-  }
-};
-
-/**
- * 重启模拟器
- */
-const restartSimulation = (): void => {
-  if (graphRef.value && graphStats.value.nodeCount > 0) {
-    nextTick(() => {
-      try {
-        graphRef.value?.restartSimulation();
-        debug.log(TAG, "手动重启模拟器成功");
-      } catch (error) {
-        debug.error(TAG, "重启模拟器失败", error);
-      }
-    });
   }
 };
 
@@ -132,13 +107,6 @@ const updateCanvasSize = (): void => {
     
     debug.log(TAG, "画布尺寸更新", canvasSize.value);
     
-    // 重启力导向图模拟
-    nextTick(() => {
-      if (graphRef.value) {
-        graphRef.value.restartSimulation();
-        debug.log(TAG, "尺寸变化后重启模拟器");
-      }
-    });
   }
 };
 
@@ -170,7 +138,6 @@ watch(showGlobalGraph, async (newValue, oldValue) => {
       // 数据加载完成后更新UI
       nextTick(() => {
         updateCanvasSize();
-        setTimeout(restartSimulation, 200);
       });
       
     } catch (error) {
@@ -202,9 +169,8 @@ watch(graphData, (newData, oldData) => {
   });
   
   if (newData && newData.nodes && newData.nodes.length > 0) {
-    // 数据有效，重启模拟器
     nextTick(() => {
-      setTimeout(restartSimulation, 100);
+      updateCanvasSize();
     });
   }
 });
@@ -310,9 +276,6 @@ debug.log(TAG, "组件初始化完成");
           </div>
           <div class="graph-actions">
             <button @click="handleReload" class="action-button" title="重新加载数据">
-              🔄
-            </button>
-            <button @click="restartSimulation" class="action-button" title="重新布局">
               🔄
             </button>
           </div>

@@ -51,48 +51,6 @@ log("Composables 初始化完成", {
 let resizeObserver: ResizeObserver | null = null;
 let isMounted = ref(false);
 
-// 方法
-const restartSimulation = (): void => {
-  log("restartSimulation 被调用", { 
-    isMounted: isMounted.value,
-    hasGraphRef: !!graphRef.value 
-  });
-  
-  if (!isMounted.value || !graphRef.value) {
-    console.warn("组件未挂载或图谱引用不存在，跳过重启模拟器");
-    return;
-  }
-  
-  nextTick(() => {
-    try {
-      graphRef.value?.restartSimulation();
-      log("正常模式模拟器重启完成");
-    } catch (error) {
-      console.error("重启正常模式模拟器失败:", error);
-    }
-  });
-};
-
-const restartFullscreenSimulation = (): void => {
-  log("restartFullscreenSimulation 被调用", { 
-    isFullscreen: fullscreenState.value.isFullscreen,
-    hasFullscreenGraphRef: !!fullscreenGraphRef.value 
-  });
-  
-  if (!fullscreenState.value.isFullscreen || !fullscreenGraphRef.value) {
-    console.warn("全屏模式未激活或全屏图谱引用不存在，跳过重启");
-    return;
-  }
-  
-  nextTick(() => {
-    try {
-      fullscreenGraphRef.value?.restartSimulation();
-      log("全屏模式模拟器重启完成");
-    } catch (error) {
-      console.error("重启全屏模式模拟器失败:", error);
-    }
-  });
-};
 
 // 安全的节点点击处理
 const safeHandleNodeClick = (path: string): void => {
@@ -119,13 +77,13 @@ const safeToggleFullscreen = (): void => {
     });
     
     // 全屏切换后重新启动模拟器
-    if (fullscreenState.value.isFullscreen) {
-      nextTick(() => {
-        setTimeout(() => {
-          restartFullscreenSimulation();
-        }, 100);
-      });
-    }
+    // if (fullscreenState.value.isFullscreen) {
+    //   nextTick(() => {
+    //     setTimeout(() => {
+    //       restartFullscreenSimulation();
+    //     }, 100);
+    //   });
+    // }
   } catch (error) {
     console.error("切换全屏时出错:", error);
   }
@@ -144,14 +102,6 @@ const safeToggleExpand = (): void => {
       newState: screenState.value.isExpanded 
     });
     
-    // 展开状态变化后重新启动模拟器
-    if (screenState.value.isExpanded) {
-      nextTick(() => {
-        setTimeout(() => {
-          restartSimulation();
-        }, 100);
-      });
-    }
   } catch (error) {
     console.error("切换展开状态时出错:", error);
   }
@@ -167,18 +117,6 @@ const handleReload = (): void => {
 watch(isLoading, (newLoading, oldLoading) => {
   log("数据加载状态变化", { 之前: oldLoading, 现在: newLoading });
   
-  if (!newLoading) {
-    // 数据加载完成，重启模拟器
-    nextTick(() => {
-      setTimeout(() => {
-        if (fullscreenState.value.isFullscreen) {
-          restartFullscreenSimulation();
-        } else {
-          restartSimulation();
-        }
-      }, 200);
-    });
-  }
 });
 
 // 监听数据变化
@@ -209,23 +147,11 @@ onMounted(() => {
             width: entry.contentRect.width,
             height: entry.contentRect.height
           });
-          // 容器尺寸变化后重启模拟器
-          if (!isLoading.valueOf) {
-            nextTick(() => {
-              restartSimulation();
-            });
-          }
         } else if (entry.target === fullscreenContainerRef.value) {
           log("全屏容器尺寸变化", {
             width: entry.contentRect.width,
             height: entry.contentRect.height
           });
-          // 全屏容器尺寸变化后重启模拟器
-          if (!isLoading.valueOf) {
-            nextTick(() => {
-              restartFullscreenSimulation();
-            });
-          }
         }
       }
     });
@@ -235,15 +161,6 @@ onMounted(() => {
       log("主容器 ResizeObserver 已监听");
     } else {
       console.warn("主容器引用为空，无法监听尺寸变化");
-    }
-
-    // 初始启动模拟器（等数据加载完成）
-    if (!isLoading.valueOf) {
-      nextTick(() => {
-        setTimeout(() => {
-          restartSimulation();
-        }, 300);
-      });
     }
 
     log("onMounted 执行完成");

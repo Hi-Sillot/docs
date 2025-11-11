@@ -65,26 +65,31 @@ export const STYLE_CONFIG = {
 };
 
 export const FORCE_CONFIG = {
-  link: d3
-    .forceLink<Node, MapLink>()
-    .id((d: Node) => d.id)
-    .distance(100) // 调整连接线的距离
-    .strength(0.8), // 调整连接线的强度
-  charge: d3
-    .forceManyBody<Node>()
-    .strength((d: Node) => { return -40 - 180 * (d.linkCount-1 || 0) }) // 根据连接数调整电荷力
-    .distanceMin(10) // 最小距离
-    .distanceMax(400), // 最大距离
-  collision: d3
-    .forceCollide<Node>()
-    .radius(30) // 调整碰撞半径
-    .strength(0.7), // 调整碰撞力的强度
-  x: d3.forceX<Node>().strength((d: Node) => (d.isIsolated ? 0.02 : 0.1)), // 减小孤立节点的X轴中心力
-  y: d3.forceY<Node>().strength((d: Node) => (d.isIsolated ? 0.02 : 0.1)), // 减小孤立节点的Y轴中心力
+  // 链接力配置
+  link: {
+    distance: 100,  // 调整连接线的距离
+    strength: 0.5
+  },
+  // 电荷力配置（节点间排斥力）
+  charge: {
+    distanceMin: 10,
+    distanceMax: 400,
+    strength: (d: Node) => { return -30 - 180 * (d.linkCount-1 || 0) }  // 根据连接数调整电荷力 负值表示排斥
+  },
+  // 碰撞力配置
+  collision: {
+    radius: 30,  // 调整碰撞半径
+    strength: 0.7,
+  },
+  // X轴中心力配置
+  x_strength: (d: any) => {return d.isIsolated ? 0.005 : 0.1}, // 减小孤立节点的X轴中心力
+  // Y轴中心力配置
+  y_strength: (d: any) => {return d.isIsolated ? 0.005 : 0.1}, // 减小孤立节点的Y轴中心力
+  // 模拟参数
   simulation: {
-    alphaDecay: 0.003, // 增加alphaDecay，使得模拟更快停止
-    alphaMin: 0.001, // 设置alphaMin，避免无限刷新
-    velocityDecay: 0.6, // 调整速度衰减，使得节点移动更平滑
+    alphaDecay: 0.006, // alpha衰减率，控制模拟停止速度
+    alphaMin: 0.01, // 设置alphaMin，避免无限刷新
+    velocityDecay: 0.5, // 调整速度衰减，使得节点移动更平滑
     restart: {
       alpha: 1,
       alphaTarget: 0.3,
@@ -95,6 +100,7 @@ export const FORCE_CONFIG = {
     },
   },
 };
+
 
 /**
  * 响应式断点配置

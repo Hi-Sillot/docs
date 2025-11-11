@@ -65,7 +65,7 @@ const canvasSize = computed(() => {
 // 组合式函数
 log("开始初始化组合式函数");
 const { themeColors, setupThemeObserver } = useTheme();
-const { simulation, initializeSimulation, restartSimulation, updateForces } = 
+const { simulation, initializeSimulation, updateForces } = 
   useSimulation(canvasSize.value, map_data.value);
 log("组合式函数初始化完成", { 
   hasSimulation: !!simulation.value,
@@ -446,9 +446,7 @@ watch([() => effectiveData.value, () => props.currentPath], ([newData, newPath],
   }
 });
 
-// 暴露方法
-defineExpose({ restartSimulation });
-log("组件定义完成");
+
 </script>
 
 <template>
