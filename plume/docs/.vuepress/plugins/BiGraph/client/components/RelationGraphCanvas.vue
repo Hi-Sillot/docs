@@ -788,3 +788,9 @@ canvas {
 }
 
 </style>
+<style>
+/* 将父容器 z-index 设为大于1，避免当前页面一些元素干扰 */
+.aside-container {
+  z-index: 20; /* 大于 artplayer 浮窗 */
+}
+</style>
