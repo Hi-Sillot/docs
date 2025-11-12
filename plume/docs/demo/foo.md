@@ -11,7 +11,7 @@ permalink: /demo/foo/
 
 <BannerTopPrNeed/>
 
-打开 `<VSCodeSettingsLink id="workbench.localHistory.enabled" />` 试试
+打开 <VSCodeSettingsLink id="workbench.localHistory.enabled" /> 试试
 
 <!-- @include: ./foo.snippet.md#VedioTabs -->
 
