@@ -776,7 +776,7 @@ debug.log(TAG, "组件初始化完成");
 
 .global-node-modal__action-btn {
   padding: 6px 12px;
-  background: var(--vp-c-brand);
+  background: var(--vp-button-alt-bg);
   color: white;
   border: none;
   border-radius: 6px;
@@ -786,7 +786,7 @@ debug.log(TAG, "组件初始化完成");
 }
 
 .global-node-modal__action-btn:hover {
-  background: var(--vp-c-brand-dark);
+  background: var(--vp-button-alt-active-bg);
 }
 
 .global-node-modal__close-btn {
