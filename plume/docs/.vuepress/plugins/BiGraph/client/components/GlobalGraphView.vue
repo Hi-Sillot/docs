@@ -18,6 +18,7 @@ debug.log(TAG, "组件初始化开始", {
   hasBioStore: !!bioStore,
   hasRouter: !!router,
   初始显示状态: bioStore.showGlobalGraph,
+  显示节点标签: bioStore.showLabels
 });
 
 // Refs
@@ -29,6 +30,7 @@ const canvasSize = ref({ width: 800, height: 600 });
 const isLoading = ref(false);
 const hasError = ref(false);
 const errorMessage = ref<string | null>(null);
+
 
 // 计算属性 - 修复：确保 graphData 总是有默认值
 const showGlobalGraph = computed(() => bioStore.showGlobalGraph);
@@ -146,6 +148,14 @@ const updateCanvasSize = (): void => {
     debug.log(TAG, "画布尺寸更新", canvasSize.value);
     
   }
+};
+
+/**
+ * 切换节点标签显示状态
+ */
+const toggleLabels = (): void => {
+  bioStore.showLabels = !bioStore.showLabels;
+  debug.log(TAG, "切换节点标签显示", { 显示标签: bioStore.showLabels });
 };
 
 // 监听器
@@ -315,6 +325,15 @@ debug.log(TAG, "组件初始化完成");
             </span>
           </div>
           <div class="graph-actions">
+            <!-- 新增：标签显示切换按钮 -->
+            <button 
+              @click="toggleLabels" 
+              class="action-button" 
+              :title="bioStore.showLabels ? '隐藏节点标签' : '显示节点标签'"
+              :class="{ 'active': bioStore.showLabels }"
+            >
+              {{ bioStore.showLabels ? '🏷️' : '🔲' }}
+            </button>
             <button @click="handleReload" class="action-button" title="重新加载数据">
               🔄
             </button>
@@ -329,6 +348,7 @@ debug.log(TAG, "组件初始化完成");
           :canvas-width="canvasSize.width"
           :current-path="router.currentRoute.value.path"
           :data="graphData"
+          :show-labels="bioStore.showLabels"
           @node-click="handleNodeClickModal"
         />
       </div>
@@ -412,6 +432,13 @@ debug.log(TAG, "组件初始化完成");
 </template>
 
 <style scoped>
+/* 新增：激活状态的按钮样式 */
+.action-button.active {
+  background: var(--vp-c-brand-soft);
+  border-color: var(--vp-c-brand);
+  color: var(--vp-c-brand);
+}
+
 /* 样式保持不变，与之前相同 */
 .global-graph-mask {
   position: fixed;

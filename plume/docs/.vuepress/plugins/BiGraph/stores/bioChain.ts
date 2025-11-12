@@ -17,6 +17,8 @@ export const useBioChainStore = defineStore("bioChain", {
     globalGraphData: null as MapNodeLink | null,
     isGlobalGraphLoading: false,
     globalGraphError: null as string | null,
+    // 新增：节点标签显示控制
+    showLabels: true as boolean,
     
     // 双链核心映射表
     bioChainMap: {} as Record<string, BioChainMapItem>,

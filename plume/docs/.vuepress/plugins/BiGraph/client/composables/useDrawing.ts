@@ -11,15 +11,26 @@ export class DrawingManager {
   private transform: any;
   private hoveredNode: Node | null = null;
   private themeColors: ThemeColors;
+  private showLabels: boolean; // 新增：控制标签显示
 
   constructor(
     context: CanvasRenderingContext2D,
     themeColors: ThemeColors,
-    transform: any
+    transform: any,
+    showLabels: boolean = true,
   ) {
     this.context = context;
     this.themeColors = themeColors;
     this.transform = transform;
+    this.showLabels = showLabels;
+  }
+
+
+    /**
+   * 设置标签显示状态并触发重绘
+   */
+  setLabelsVisibility(visible: boolean): void {
+    this.showLabels = visible;
   }
 
   setHoveredNode(node: Node | null): void {
@@ -80,6 +91,8 @@ export class DrawingManager {
   }
 
   drawLabels(nodes: Node[]): void {
+    // 如果不显示标签，直接返回
+    if (!this.showLabels) return;
     this.context.font = STYLE_CONFIG.text.font;
     const { text } = this.themeColors;
     const connectedNodes = this.getConnectedNodes();
@@ -212,6 +225,7 @@ export class DrawingManager {
 
   private findNodeById(id: string): Node | undefined {
     // 这里需要访问完整的nodes数据，需要在外部传入
+    console.warn("findNodeById 尚未实现")
     return undefined;
   }
 }

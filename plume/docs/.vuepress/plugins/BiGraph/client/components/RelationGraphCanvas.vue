@@ -9,7 +9,8 @@ import { DrawingManager } from "../composables/useDrawing";
 import { EventHandlers } from "../composables/useEventHandlers";
 import { PathUtils } from "../../utils/path-utils";
 import { CANVAS_CONFIG } from "../../constants";
-
+import { useBioChainStore } from "../../stores/bioChain";
+const bioStore = useBioChainStore();
 let TAG = "RelationGraph.vue";
 // 日志计数器
 let logCounter = 0;
@@ -32,6 +33,8 @@ const props = defineProps<{
   canvasWidth: number;
   canvasHeight: number;
 }>();
+
+
 // 计算属性 - 修复：处理 null 数据
 const effectiveData = computed(() => {
   return props.data || { nodes: [], links: [] };
@@ -489,7 +492,7 @@ function ticked(): void {
   
   const context = canvasRef.value.getContext("2d");
   if (!context) return;
-
+  drawingManager.setLabelsVisibility(bioStore.showLabels);
   drawingManager.clearCanvas(canvasSize.value);
   drawingManager.applyTransform();
   drawingManager.drawLinks(map_data.value.links);
@@ -565,6 +568,7 @@ watch(() => canvasSize.value, (newSize, oldSize) => {
     log("模拟器重启");
   }
 });
+
 
 // 监听器 - 修复：使用 effectiveData
 watch([() => effectiveData.value, () => props.currentPath], ([newData, newPath], [oldData, oldPath]) => {
