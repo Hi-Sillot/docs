@@ -35,13 +35,6 @@ permalink: /demo/foo/
 
 6
 
-<!-- 
-<VideoTabs 
-  ap="https://artplayer.org/assets/sample/video.mp4" 
-  ac="ac47421657" 
-  bb="BV1ZMNQziEGd" 
-  active="bb" 
-/> -->
 
 <!-- @include: ./foo.snippet.md -->
 

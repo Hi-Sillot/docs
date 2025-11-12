@@ -16,6 +16,7 @@ import { llmsPlugin } from '@vuepress/plugin-llms' // 为你的站点添加 llms
 import { revealJsPlugin } from '@vuepress/plugin-revealjs' // 在你的 VuePress 中添加幻灯片
 import BiGraph from "./plugins/BiGraph/client/index";
 import AuthorPlugin from './plugins/Author/authorData'
+import SillotTabsPlugin from './plugins/vuepress-plugin-sillot-tabs'
 
 export default defineUserConfig({
   port:5858,
@@ -49,6 +50,10 @@ export default defineUserConfig({
     llmsPlugin({
       // 配置项
     }),
+    // 注册Sillot标签插件（传入自定义配置）
+    SillotTabsPlugin({
+      videoTabs: {}
+}),
     AuthorPlugin(),
     BiGraph({
       localGraphDeep: 20,
@@ -152,7 +157,7 @@ export default defineUserConfig({
       pdf: true,          // 启用 PDF 嵌入 @[pdf](/xxx.pdf)
       caniuse: true,      // 启用 caniuse 语法  @[caniuse](feature_name)
       plot: true,         // 启用隐秘文本语法 !!xxxx!!
-      bilibili: true,     // 启用嵌入 bilibili视频 语法 @[bilibili](bid)
+      bilibili: true,     // 启用嵌入 BiliBILI视频 语法 @[BiliBILI](bid)
       acfun: true,        // 启用嵌入 acfun视频 语法 @[acfun](aid)
       youtube: true,      // 启用嵌入 youtube视频 语法 @[youtube](video_id)
       artPlayer: true,    // 启用嵌入 artPlayer 本地视频 语法 @[artPlayer](url)
