@@ -1,29 +1,33 @@
 import { defineClientConfig } from "vuepress/client";
+import { setup } from '@css-render/vue3-ssr'
+import { NaiveUI } from "./modules/NaiveUi";
 
 // 布局
 import Layout from "./layouts/Layout.vue";
 import AuthorDetail from "./layouts/AuthorDetail.vue";
 import AuthorList from "./layouts/AuthorList.vue";
 // 组件
-import BannerTopArchived from "./components/BannerTopArchived.vue"
-import BannerTopPrLock from "./components/BannerTopPrLock.vue"
-import BannerTopPrNeed from "./components/BannerTopPrNeed.vue"
-import VSCodeSettingsLink from "./components/VSCodeSettingsLink.vue"
-import GithubLabel from "./components/GithubLabel.vue"
-import C from "./components/Const.vue"
+import BannerTopArchived from "./components/BannerTopArchived.vue";
+import BannerTopPrLock from "./components/BannerTopPrLock.vue";
+import BannerTopPrNeed from "./components/BannerTopPrNeed.vue";
+import VSCodeSettingsLink from "./components/VSCodeSettingsLink.vue";
+import GithubLabel from "./components/GithubLabel.vue";
+import C from "./components/Const.vue";
+import TestNaiveUi from "./components/TestNaiveUi.vue";
 
 import { createPinia } from "pinia";
 import { useAuthorStore } from "./stores/author";
 
 import "./styles/index.css";
 import { useBioChainStore } from "./plugins/BiGraph/stores/bioChain";
-// import { useBioChainStore } from "./plugins/BiGraph/stores/bio-chain-store";
 import { TEMP_FILE_NAMES } from "./plugins/BiGraph/constants/index";
 import { BioChainService } from "./plugins/BiGraph/services/bio-chain-service";
 
+/**
+ * vuepress 的 SSR 兼容参考 https://vitepress.dev/zh/guide/ssr-compat
+ */
 export default defineClientConfig({
   setup() {
-
   },
   layouts: {
     Layout,
@@ -38,13 +42,23 @@ export default defineClientConfig({
     // app.component('NpmBadgeGroup', NpmBadgeGroup)
     // app.component('Swiper', Swiper) // you should install `swiper`
 
-    // 注册全局组件
-    app.component('BannerTopArchived', BannerTopArchived)
-    app.component('BannerTopPrLock', BannerTopPrLock)
-    app.component('BannerTopPrNeed', BannerTopPrNeed)
-    app.component('VSCodeSettingsLink', VSCodeSettingsLink)
-    app.component('GithubLabel', GithubLabel)
-    app.component('C', C)
+    //@ts-ignore
+    // ref https://www.naiveui.com/zh-CN/dark/docs/vitepress
+    if (import.meta.env.SSR) {
+      const { collect } = setup(app)
+      app.provide('css-render-collect', collect)
+    }
+
+    app.use(NaiveUI); // https://www.naiveui.com/zh-CN/dark/docs/import-on-demand
+
+    // 注册全局组件，不在 md 中使用则不需注册
+    app.component("BannerTopArchived", BannerTopArchived);
+    app.component("BannerTopPrLock", BannerTopPrLock);
+    app.component("BannerTopPrNeed", BannerTopPrNeed);
+    app.component("VSCodeSettingsLink", VSCodeSettingsLink);
+    app.component("GithubLabel", GithubLabel);
+    app.component("C", C);
+    app.component("TestNaiveUi", TestNaiveUi);
 
     // 注册Pinia状态管理
     const pinia = createPinia();
@@ -70,12 +84,12 @@ export default defineClientConfig({
     // @ts-ignore
     import(`./.temp/${TEMP_FILE_NAMES.BIO_TS}.js`).then((module) => {
       console.log(`@temp/${TEMP_FILE_NAMES.BIO_TS}.js ok`, {
-            页面数: module.pageCount,
-            有效页面数: module.validPageCount
-          }, module.default);
+        页面数: module.pageCount,
+        有效页面数: module.validPageCount,
+      }, module.default);
       // 将数据存入Pinia存储
-      bioStore.BiGraph = module.default
-      BioChainService.build(bioStore.BiGraph!.getAllPages())
+      bioStore.BiGraph = module.default;
+      BioChainService.build(bioStore.BiGraph!.getAllPages());
     });
   },
-})
+});

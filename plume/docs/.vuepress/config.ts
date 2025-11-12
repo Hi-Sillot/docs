@@ -36,6 +36,9 @@ export default defineUserConfig({
           allowedHosts: true
             // allowedHosts: ['pc.sc']
         },
+        ssr: {
+        noExternal: ['naive-ui', 'date-fns', 'vueuc'] // 'date-fns', 'vueuc' 是 naive-ui 的依赖
+      }
     },
     devServer: {
       // 关键配置：为所有响应添加CORS头

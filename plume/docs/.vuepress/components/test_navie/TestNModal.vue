@@ -1,0 +1,113 @@
+<template>
+  <n-flex>
+    <n-button @click="showModal1 = !showModal1">
+      card 预设
+    </n-button>
+    <n-button @click="showModal2 = !showModal2">
+      dialog 预设
+    </n-button>
+    <n-button @click="showModal3 = !showModal3">
+      无预设
+    </n-button>
+    <n-button @click="showDialogPreset">
+      dialog 预设（命令式 Api）
+    </n-button>
+    <n-button @click="showCardPreset">
+      card 预设（命令式 Api）
+    </n-button>
+    <n-button @click="showModal4 = !showModal4">
+      弹窗嵌套
+    </n-button>
+  </n-flex>
+  <n-modal
+    v-model:show="showModal1"
+    title="card 预设拖拽"
+    preset="card"
+    draggable
+    :style="{ width: '800px' }"
+  >
+    <div>无意义的内容...</div>
+    <div>无意义的内容...</div>
+    <div>无意义的内容...</div>
+    <div>无意义的内容...</div>
+    <div>无意义的内容...</div>
+    <div>无意义的内容...</div>
+    <div>无意义的内容...</div>
+    <div>无意义的内容...</div>
+    <div>无意义的内容...</div>
+    <div>无意义的内容...</div>
+  </n-modal>
+  <n-modal
+    v-model:show="showModal2"
+    title="dialog 预设拖拽"
+    preset="dialog"
+    draggable
+    :style="{ width: '800px' }"
+  >
+    <div>无意义的内容...</div>
+    <div>无意义的内容...</div>
+    <div>无意义的内容...</div>
+    <div>无意义的内容...</div>
+    <div>无意义的内容...</div>
+    <div>无意义的内容...</div>
+    <div>无意义的内容...</div>
+    <div>无意义的内容...</div>
+    <div>无意义的内容...</div>
+    <div>无意义的内容...</div>
+  </n-modal>
+  <n-modal
+    v-model:show="showModal3"
+    title="无预设拖拽"
+    draggable
+    :style="{ width: '800px' }"
+  >
+    <template #default="{ draggableClass }">
+      <n-card>
+        <div :class="draggableClass">
+          点我拖拽
+        </div>
+      </n-card>
+    </template>
+  </n-modal>
+  <n-modal
+    v-model:show="showModal4"
+    title="嵌套弹窗拖拽"
+    preset="card"
+    :draggable="{ bounds: 'none' }"
+    :style="{ width: '800px' }"
+  >
+    <n-button @click="showDialogPreset">
+      再开一个弹窗
+    </n-button>
+  </n-modal>
+</template>
+
+<script setup lang="ts">
+import { useModal } from 'naive-ui'
+import { ref } from 'vue'
+
+const modal = useModal()
+
+const showModal1 = ref(false)
+const showModal2 = ref(false)
+const showModal3 = ref(false)
+const showModal4 = ref(false)
+
+function showDialogPreset() {
+  modal.create({
+    title: 'Dialog 预设拖拽',
+    draggable: true,
+    preset: 'dialog',
+    content: '无意义的内容....'
+  })
+}
+
+function showCardPreset() {
+  modal.create({
+    title: 'Card 预设拖拽',
+    draggable: true,
+    preset: 'card',
+    content: '无意义的内容....'
+  })
+}
+</script>
