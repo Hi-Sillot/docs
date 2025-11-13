@@ -2,21 +2,16 @@
  * @fileOverview index.ts
  * @author erduotong
  */
-// import { getDirname, path } from "vuepress/utils";
-// import {
-//     buildAndWriteMapData,
-// } from "./buildMapData";
-// import {buildBioChainMap, writeGlobalGraph, writeTempGlobalGraph} from "./buildMapData2";
+import { getDirname, path } from "vuepress/utils";
 import type { App, Page, Plugin } from "vuepress/core";
 import { BiGraphConfig } from "../types";
-// import type { BiGraphConfig, Plugin } from "../types";
 import { ConfigManager } from "./config-manager";
 import { BioChainService } from "../services/bio-chain-service";
 import { debug } from '../utils/debug';
 import { GlobalMapBuilder } from "../builders/global-map-builder";
 import { TempFileWriter } from "./temp-file-writer";
 
-// const __dirname = getDirname(import.meta.url);
+const __dirname = getDirname(import.meta.url);
 export let options: BiGraphConfig = {};
 const graph_path = { target: "" };
 const TAG = "BiGraph";

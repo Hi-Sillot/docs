@@ -14,6 +14,9 @@ import VSCodeSettingsLink from "./components/VSCodeSettingsLink.vue";
 import GithubLabel from "./components/GithubLabel.vue";
 import C from "./components/Const.vue";
 import TestNaiveUi from "./components/TestNaiveUi.vue";
+import TestRelationGraph from "./plugins/vuepress-plugin-sillot-vivime/components/TestRelationGraph.vue";
+// 模板组件，一般不在 md 中使用，这里使用只是前期开发调试
+import SSRComponent from "./components/templates/SSRComponent.vue";
 
 import { createPinia } from "pinia";
 import { useAuthorStore } from "./stores/author";
@@ -35,7 +38,7 @@ export default defineClientConfig({
     AuthorList,
     AuthorDetail,
   },
-  enhance({ app, router }) {
+  async enhance({ app, router }) {
     // built-in components
     // app.component('RepoCard', RepoCard)
     // app.component('NpmBadge', NpmBadge)
@@ -59,6 +62,8 @@ export default defineClientConfig({
     app.component("GithubLabel", GithubLabel);
     app.component("C", C);
     app.component("TestNaiveUi", TestNaiveUi);
+    app.component('TestRelationGraph', TestRelationGraph);
+    app.component("SSRComponent", SSRComponent);
 
     // 注册Pinia状态管理
     const pinia = createPinia();
