@@ -4,7 +4,7 @@ import { Layout } from 'vuepress-theme-plume/client'
 import Backlink from "../plugins/BiGraph/client/components/Backlink.vue";
 import LocalGraph from "../plugins/BiGraph/client/components/LocalGraphView.vue";
 import GlobalGraph from "../plugins/BiGraph/client/components/GlobalGraphView.vue";
-import AuthorLink from "../plugins/Author/components/AuthorLink.vue";
+import AuthorLink from "../plugins/vuepress-plugin-sillot-author/components/AuthorLink.vue";
 
 
 declare const __RELATIONAL_GRAPH_ENABLE_LOCAL_GRAPH: boolean;
@@ -26,7 +26,7 @@ const options = computed(() => {
     <template #aside-outline-before>
       <local-graph v-if="options.enableLocalGraph"></local-graph>
     </template>
-    <template #doc-meta-before>
+    <template #doc-meta-bottom>
       <AuthorLink></AuthorLink>
     </template>
   </Layout>

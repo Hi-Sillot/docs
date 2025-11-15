@@ -170,10 +170,13 @@ function handleVideoTabs(
   return markdown;
 }
 
+/**
+ * 插件入口
+ */
 export default (options: PluginOptions = {}): Plugin => {
   console.log("[SillotTabs] 插件加载成功", JSON.stringify(options));
   return {
-    name: "vuepress-plugin-sillot-tabs",
+    name: "vuepress-plugin-sillot-tabs",  // 插件名称
 
     extendsMarkdown: (md: Markdown) => {
       const tagHandlers: TagHandlers = {

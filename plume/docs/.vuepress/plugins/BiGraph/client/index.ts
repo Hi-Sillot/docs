@@ -50,12 +50,12 @@ const BiGraph = (config: BiGraphConfig = {}): Plugin => ({
     onPrepared: async (app: App) => {
          debug.log('BiGraph', 'onPrepared 开始', { 
         pageCount: app.pages.length,
-        samplePages: app.pages.slice(0, 3).map(p => ({
-          path: p.path,
-          title: p.title,
-          permalink: p.permalink,
-          linksCount: p.links?.length || 0
-        }))
+        // samplePages: app.pages.slice(0, 3).map(p => ({
+        //   path: p.path,
+        //   title: p.title,
+        //   permalink: p.permalink,
+        //   linksCount: p.links?.length || 0
+        // }))
       });
 
 

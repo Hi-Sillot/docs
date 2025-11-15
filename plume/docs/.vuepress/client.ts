@@ -20,7 +20,7 @@ import SSRComponent from "./components/templates/SSRComponent.vue";
 
 import { createPinia } from "pinia";
 import piniaPluginPersistedstate from "pinia-plugin-persistedstate";
-import { useAuthorStore } from "./stores/author";
+import { useAuthorStore } from "./plugins/vuepress-plugin-sillot-author/stores/author";
 
 import "./styles/index.css";
 import { useBioChainStore } from "./plugins/BiGraph/stores/bioChain";
@@ -78,14 +78,32 @@ export default defineClientConfig({
       console.log("@temp/author-data.ts ok", module.default);
       // 将数据存入Pinia存储
       authorStore.setAuthors(module.default);
-      // 动态注册路由，必须有对应的文件存在
-      router.addRoute({
-        path: "/authors/:slug/",
-        component: AuthorDetail,
-        name: "AuthorDetail",
-      });
     });
 
+    router.addRoute({
+      path: "/authors.html",
+      component: AuthorList,
+      name: "AuthorList",
+    });
+
+    router.addRoute({
+      path: "/authors/:pathMatch(.*)*",
+      component: AuthorDetail,
+      name: "AuthorDetailCatchAll",
+    });
+
+    console.log("作者详情页路由已注册");
+    // 路由守卫处理
+    router.beforeEach((to) => {
+      // 匹配作者详情页路由
+      if (to.path.startsWith("/authors.html") || (to.path.startsWith("/authors/") && !to.path.endsWith("/"))) {
+        // 自动添加尾部斜杠，确保与创建的页面路径一致 authors/a.thml -> authors/a/
+        const normalizedPath = to.path.endsWith("/") ? to.path : to.path + "/";
+        if (normalizedPath !== to.path) {
+          return normalizedPath.replace('.html', '');
+        }
+      }
+    });
     // 初始化存储
     const bioStore = useBioChainStore();
     // @ts-ignore

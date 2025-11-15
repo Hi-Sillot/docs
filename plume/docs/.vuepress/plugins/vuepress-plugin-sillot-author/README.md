@@ -5,7 +5,6 @@
 * [ ] 认证个体
 * [ ] 与Artalk联动
 
-
 组件库：Naive UI
 
-中后台：Nova Admin
+中后台：Nave UI Pro

@@ -41,12 +41,12 @@ let fileName = path.join(app.dir.temp(), `${TEMP_FILE_NAMES.BIO_TS}.js`)
   private static generateBioFileContent(pages: any[]): string {
     debug.log(TAG, '生成临时文件内容', { 
       页面数: pages.length,
-      示例页面: pages.slice(0, 3).map(p => ({
-        path: p.path,
-        title: p.title,
-        permalink: p.permalink,
-        linksCount: p.links?.length || 0
-      }))
+      // 示例页面: pages.slice(0, 3).map(p => ({
+      //   path: p.path,
+      //   title: p.title,
+      //   permalink: p.permalink,
+      //   linksCount: p.links?.length || 0
+      // }))
     });
 
     // 过滤有效页面（有 permalink 的页面）

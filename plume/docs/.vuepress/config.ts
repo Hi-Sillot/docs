@@ -15,7 +15,7 @@ import { plumeTheme } from 'vuepress-theme-plume'
 import { llmsPlugin } from '@vuepress/plugin-llms' // 为你的站点添加 llms.txt，以提供对 LLM 友好的内容。https://ecosystem.vuejs.press/zh/plugins/ai/llms.html
 import { revealJsPlugin } from '@vuepress/plugin-revealjs' // 在你的 VuePress 中添加幻灯片
 import BiGraph from "./plugins/BiGraph/client/index";
-import AuthorPlugin from './plugins/Author/authorData'
+import AuthorPlugin from './plugins/vuepress-plugin-sillot-author'
 import SillotTabsPlugin from './plugins/vuepress-plugin-sillot-tabs'
 
 export default defineUserConfig({
