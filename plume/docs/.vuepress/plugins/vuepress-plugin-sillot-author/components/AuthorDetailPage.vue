@@ -2,8 +2,8 @@
 <script lang="ts" setup>
 import { computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { useAuthorStore } from '../plugins/vuepress-plugin-sillot-author/stores/author'
-import Base from './Base.vue'
+import { useAuthorStore } from '../stores/author'
+import Base from '../../../layouts/Base.vue'
 
 const route = useRoute()
 const authorStore = useAuthorStore()
@@ -94,7 +94,7 @@ onMounted(() => {
               <div v-for="post in author.posts" :key="post.path" class="post-card">
                 <RouterLink :to="post.path" class="post-link">
                   <div class="post-content">
-                    <h3 class="post-title">{{ post.title }}</h3>
+                    <h3 class="post-title">{{ post.title }}<span class="post-path">{{ post.path }}</span></h3>
                     <div class="post-meta">
                       <span class="post-date">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -302,6 +302,13 @@ onMounted(() => {
   margin: 0 0 0.5rem 0;
   color: var(--vp-c-text-1);
   transition: color 0.2s ease;
+}
+
+.post-path {
+  color: var(--vp-c-text-2);
+  margin-left: 10px;
+  font-size: 0.8rem;
+  font-weight: 300;
 }
 
 .post-link:hover .post-title {

@@ -2,8 +2,8 @@
 <script lang="ts" setup>
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { useAuthorStore } from '../plugins/vuepress-plugin-sillot-author/stores/author'
-import Base from './Base.vue'
+import { useAuthorStore } from '../stores/author'
+import Base from '../../../layouts/Base.vue'
 
 const route = useRoute()
 const authorStore = useAuthorStore()

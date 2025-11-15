@@ -4,8 +4,8 @@ import { NaiveUI } from "./modules/NaiveUi";
 
 // 布局
 import Layout from "./layouts/Layout.vue";
-import AuthorDetail from "./layouts/AuthorDetail.vue";
-import AuthorList from "./layouts/AuthorList.vue";
+import AuthorDetail from "./plugins/vuepress-plugin-sillot-author/components/AuthorDetailPage.vue";
+import AuthorList from "./plugins/vuepress-plugin-sillot-author/components/AuthorListPage.vue";
 // 组件
 import BannerTopArchived from "./components/BannerTopArchived.vue";
 import BannerTopPrLock from "./components/BannerTopPrLock.vue";
