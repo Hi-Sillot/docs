@@ -18,11 +18,11 @@ const contentRef = ref(null)
 // 检查是否需要折叠
 const checkOverflow = () => {
   if (!containerRef.value || !contentRef.value) return
-  
+
   nextTick(() => {
     const containerWidth = containerRef.value.offsetWidth
     const contentWidth = contentRef.value.scrollWidth
-    
+
     // 检查内容是否超出容器宽度
     isOverflowing.value = contentWidth > containerWidth
   })
@@ -46,7 +46,7 @@ const handleClickOutside = (event) => {
 onMounted(() => {
   // 初始检查
   checkOverflow()
-  
+
   // 监听窗口大小变化
   window.addEventListener('resize', checkOverflow)
   document.addEventListener('click', handleClickOutside)
@@ -59,26 +59,16 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div 
-    ref="containerRef"
-    class="author-links"
-    :class="{ 
-      'expanded': isExpanded,
-      'overflowing': isOverflowing,
-      'single-author': authors.length === 1
-    }"
-    @click="toggleExpand"
-  >
+  <div v-if="authors.length > 0" ref="containerRef" class="author-links" :class="{
+    'expanded': isExpanded,
+    'overflowing': isOverflowing,
+    'single-author': authors.length === 1
+  }" @click="toggleExpand">
     <span class="authors-label">本文编辑：</span>
-    
+
     <div ref="contentRef" class="authors-content">
-      <RouteLink 
-        v-for="(author, index) in authors"
-        :key="author.slug"
-        :to="`/authors/${author.slug}`"
-        class="author-link"
-        @click.stop
-      >
+      <RouteLink v-for="(author, index) in authors" :key="author.slug" :to="`/authors/${author.slug}`"
+        class="author-link" @click.stop>
         <!-- 作者头像 -->
         <div class="avatar-container">
           <img v-if="author.avatar" :src="author.avatar" class="avatar" :alt="author.name" />
@@ -86,40 +76,37 @@ onUnmounted(() => {
             {{ author.name.charAt(0).toUpperCase() }}
           </div>
         </div>
-        
+
         <!-- 作者姓名 -->
         <span class="author-name">{{ author.name }}</span>
-        
+
         <!-- 分隔符（非最后一个作者） -->
         <span v-if="index < authors.length - 1" class="author-separator">,</span>
       </RouteLink>
     </div>
-    
+
     <!-- 折叠/展开指示器 -->
     <div v-if="isOverflowing" class="expand-indicator">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M6 9L12 15L18 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M6 9L12 15L18 9" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+          stroke-linejoin="round" />
       </svg>
       <span class="expand-text">{{ isExpanded ? '收起全部' : `展开全部` }}</span>
     </div>
-    
+
     <!-- 展开时的浮动面板 -->
     <div v-if="isExpanded" class="author-popover">
       <div class="popover-header">
         <h4>本文编辑</h4>
         <button class="close-popover" @click.stop="isExpanded = false">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round" />
           </svg>
         </button>
       </div>
       <div class="popover-authors">
-        <RouteLink 
-          v-for="author in authors"
-          :key="author.slug"
-          :to="`/authors/${author.slug}`"
-          class="popover-author"
-        >
+        <RouteLink v-for="author in authors" :key="author.slug" :to="`/authors/${author.slug}`" class="popover-author">
           <div class="avatar-container">
             <img v-if="author.avatar" :src="author.avatar" class="avatar" :alt="author.name" />
             <div v-else class="avatar-placeholder">
@@ -297,6 +284,7 @@ onUnmounted(() => {
     opacity: 0;
     transform: translateY(-5px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -388,16 +376,16 @@ onUnmounted(() => {
     padding: 6px 10px;
     max-width: 100%;
   }
-  
+
   .authors-label {
     font-size: 0.8rem;
   }
-  
+
   .author-name {
     font-size: 0.85rem;
     max-width: 100px;
   }
-  
+
   .author-popover {
     position: fixed;
     top: 50%;
@@ -415,7 +403,7 @@ onUnmounted(() => {
     background: var(--vp-c-bg-soft-down);
     border-color: var(--vp-c-border);
   }
-  
+
   .author-link:hover {
     background: var(--vp-c-bg-soft);
   }
@@ -431,6 +419,7 @@ onUnmounted(() => {
     opacity: 0;
     transform: translateY(5px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
