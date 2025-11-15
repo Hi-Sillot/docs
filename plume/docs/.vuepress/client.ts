@@ -10,9 +10,9 @@ import AuthorList from "./layouts/AuthorList.vue";
 import BannerTopArchived from "./components/BannerTopArchived.vue";
 import BannerTopPrLock from "./components/BannerTopPrLock.vue";
 import BannerTopPrNeed from "./components/BannerTopPrNeed.vue";
-import VSCodeSettingsLink from "./components/VSCodeSettingsLink.vue";
-import GithubLabel from "./components/GithubLabel.vue";
-import C from "./components/Const.vue";
+import VSCodeSettingsLink from "./plugins/vuepress-plugin-sillot-inline/components/VSCodeSettingsLink.vue";
+import GithubLabel from "./plugins/vuepress-plugin-sillot-inline/components/GithubLabel.vue";
+import C from "./plugins/vuepress-plugin-sillot-inline/components/Const.vue";
 import TestNaiveUi from "./components/TestNaiveUi.vue";
 import TestRelationGraph from "./plugins/vuepress-plugin-sillot-vivime/components/TestRelationGraph.vue";
 // 模板组件，一般不在 md 中使用，这里使用只是前期开发调试

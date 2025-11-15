@@ -16,3 +16,8 @@
 ## vuepress-plugin-sillot-author
 
 文章作者插件
+
+
+## vuepress-plugin-sillot-inline
+
+行内组件
