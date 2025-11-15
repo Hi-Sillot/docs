@@ -10,6 +10,7 @@ const TAG = "useBioChainStore";
 let options: BiGraphConfig = {};
 
 export const useBioChainStore = defineStore("bioChain", {
+  persist: true, // 启用持久化存储
   state: () => ({
     BiGraph: null as BiGraph | null,
     // 全局图谱状态

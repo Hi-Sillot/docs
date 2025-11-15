@@ -41,6 +41,7 @@
     "grapheme-splitter": "^1.0.4",
     "localforage": "^1.10.0",
     "mermaid": "^11.7.0",
+    "pinia-plugin-persistedstate": "^4.7.1",
     "pyodide": "^0.29.0",
     "relation-graph-vue3": "^2.2.11"
   },

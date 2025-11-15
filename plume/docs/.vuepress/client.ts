@@ -1,5 +1,5 @@
 import { defineClientConfig } from "vuepress/client";
-import { setup } from '@css-render/vue3-ssr'
+import { setup } from "@css-render/vue3-ssr";
 import { NaiveUI } from "./modules/NaiveUi";
 
 // 布局
@@ -19,6 +19,7 @@ import TestRelationGraph from "./plugins/vuepress-plugin-sillot-vivime/component
 import SSRComponent from "./components/templates/SSRComponent.vue";
 
 import { createPinia } from "pinia";
+import piniaPluginPersistedstate from "pinia-plugin-persistedstate";
 import { useAuthorStore } from "./stores/author";
 
 import "./styles/index.css";
@@ -44,13 +45,18 @@ export default defineClientConfig({
     // app.component('NpmBadge', NpmBadge)
     // app.component('NpmBadgeGroup', NpmBadgeGroup)
     // app.component('Swiper', Swiper) // you should install `swiper`
+    // 注册Pinia状态管理
+    const pinia = createPinia();
 
     //@ts-ignore
     // ref https://www.naiveui.com/zh-CN/dark/docs/vitepress
     if (import.meta.env.SSR) {
-      const { collect } = setup(app)
-      app.provide('css-render-collect', collect)
+      const { collect } = setup(app);
+      app.provide("css-render-collect", collect);
+    } else {
+      pinia.use(piniaPluginPersistedstate); // 注册插件
     }
+    app.use(pinia);
 
     app.use(NaiveUI); // https://www.naiveui.com/zh-CN/dark/docs/import-on-demand
 
@@ -62,12 +68,8 @@ export default defineClientConfig({
     app.component("GithubLabel", GithubLabel);
     app.component("C", C);
     app.component("TestNaiveUi", TestNaiveUi);
-    app.component('TestRelationGraph', TestRelationGraph);
+    app.component("TestRelationGraph", TestRelationGraph);
     app.component("SSRComponent", SSRComponent);
-
-    // 注册Pinia状态管理
-    const pinia = createPinia();
-    app.use(pinia);
 
     // 初始化存储
     const authorStore = useAuthorStore();
